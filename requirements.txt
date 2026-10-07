@@ -1,0 +1,9 @@
+streamlit>=1.60
+pandas
+# Snowflake: pinned >=4.0 and WITHOUT the [pandas] extra. On Python 3.13+
+# (Community Cloud runs 3.14) the extra's pyarrow pin made the resolver fall
+# back to an ancient connector whose old botocore vendors requests -> imports
+# `cgi` (removed in 3.13) -> "No module named 'cgi'". The app only uses cursor
+# fetches.
+snowflake-connector-python>=4.0
+cryptography

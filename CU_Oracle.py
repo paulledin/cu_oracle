@@ -1,19 +1,23 @@
-"""The Credit Union Oracle — Streamlit in Snowflake chat app.
+"""The Credit Union Oracle — Streamlit chat app (Streamlit Community Cloud).
 
 Questions go straight to a Cortex Agent (SNOWFLAKE.CORTEX.AGENT_RUN) whose only
 tool is Cortex Analyst over the CU_ORACLE_SEMANTIC semantic view. Cortex plans,
 queries the semantic view, and writes the answer; this app only renders it.
+Snowflake access is the CU_ORACLE_APP_SVC service account (see db.py).
 """
 import json
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from snowflake.snowpark.context import get_active_session
+
+import auth
+import db
 
 SEMANTIC_VIEW = "CU_ORACLE_AGENT_DB.ANALYTICS.CU_ORACLE_SEMANTIC"
 WAREHOUSE = "STREAMLIT_WH"          # warehouse Cortex uses to run its queries
 ORCHESTRATION_MODEL = "auto"        # or pin a model, e.g. "claude-sonnet-4-5"
-IMAGE_PATH = "@cu_oracle_agent_db.analytics.STG_IMAGES/Socrates.png"
+IMAGE_PATH = Path(__file__).parent / "assets" / "Socrates.png"
 MAX_HISTORY_MESSAGES = 10           # prior chat messages sent back for follow-up context
 
 RESPONSE_INSTRUCTIONS = """You are the Credit Union Oracle, an expert on US credit unions and an
@@ -68,10 +72,9 @@ def build_request(history: list[dict], question: str) -> dict:
     }
 
 
-def ask_oracle(session, history: list[dict], question: str) -> dict:
+def ask_oracle(history: list[dict], question: str) -> dict:
     body = json.dumps(build_request(history, question))
-    raw = session.sql("SELECT SNOWFLAKE.CORTEX.AGENT_RUN(?)", params=[body]).collect()[0][0]
-    return json.loads(raw)
+    return json.loads(db.query_one("SELECT SNOWFLAKE.CORTEX.AGENT_RUN(%s)", (body,)))
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +140,9 @@ def render_answer(answer: dict):
         elif block["type"] == "table":
             if block["title"]:
                 st.caption(block["title"])
-            st.dataframe(block["df"], use_container_width=True, hide_index=True)
+            st.dataframe(block["df"], width="stretch", hide_index=True)
         elif block["type"] == "chart":
-            st.vega_lite_chart(block["spec"], use_container_width=True)
+            st.vega_lite_chart(block["spec"], width="stretch")
 
 
 def queue_question(question: str):
@@ -147,24 +150,24 @@ def queue_question(question: str):
 
 
 def main():
-    session = get_active_session()
+    st.set_page_config(page_title="The Credit Union Oracle", page_icon="🏛️")
 
     st.title("The Credit Union Oracle")
     st.caption("Brought to You by America's Credit Unions. Powered by Snowflake Cortex.")
-
-    try:
-        st.image(session.file.get_stream(IMAGE_PATH, decompress=False).read(), width=300)
-    except Exception as e:
-        st.error(f"Error loading image from stage: {e}")
-
-    with st.sidebar:
-        if st.button("New conversation", use_container_width=True):
-            st.session_state.messages = []
-
-    st.divider()
+    if IMAGE_PATH.exists():
+        st.image(str(IMAGE_PATH), width=300)
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    if not auth.login_sidebar():
+        st.info("Sign in with your passphrase in the sidebar to consult the Oracle.")
+        return
+
+    if st.sidebar.button("New conversation", width="stretch"):
+        st.session_state.messages = []
+
+    st.divider()
 
     # Replay conversation
     for i, msg in enumerate(st.session_state.messages):
@@ -192,9 +195,11 @@ def main():
     with st.chat_message("assistant"):
         with st.spinner("Consulting the Oracle..."):
             try:
-                answer = parse_response(ask_oracle(session, history, prompt))
+                answer = parse_response(ask_oracle(history, prompt))
             except Exception as e:
-                st.error(f"The Oracle could not answer: {e}")
+                auth.log.exception("Oracle request failed")
+                st.error(f"The Oracle could not answer that one. Please try again, or contact "
+                         f"{auth.CONTACT} if it keeps happening.\n\nDetails: {e}")
                 st.session_state.messages.pop()  # don't keep an unanswered question in history
                 return
         st.session_state.messages.append({"role": "assistant", "text": answer["text"], "answer": answer})
