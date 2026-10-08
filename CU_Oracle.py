@@ -18,6 +18,7 @@ SEMANTIC_VIEW = "CU_ORACLE_AGENT_DB.ANALYTICS.CU_ORACLE_SEMANTIC"
 WAREHOUSE = "STREAMLIT_WH"          # warehouse Cortex uses to run its queries
 ORCHESTRATION_MODEL = "auto"        # or pin a model, e.g. "claude-sonnet-4-5"
 IMAGE_PATH = Path(__file__).parent / "assets" / "Socrates.png"
+LOGO = "https://raw.githubusercontent.com/paulledin/data/master/ACUS.jpg"  # same logo as the CRANA app
 MAX_HISTORY_MESSAGES = 10           # prior chat messages sent back for follow-up context
 SUPPORT_EMAIL = auth.CONTACT
 
@@ -159,6 +160,7 @@ def queue_question(question: str):
 
 def main():
     st.set_page_config(page_title="The Credit Union Oracle", page_icon="🏛️")
+    st.sidebar.image(LOGO)
 
     st.title("The Credit Union Oracle")
     st.caption("Brought to You by America's Credit Unions. Powered by Snowflake Cortex.")
