@@ -1,5 +1,31 @@
+# America's Credit Unions brand theme (see the ACU visual brand guide).
+# Palette: Teal 9ED4D5, Pink DDBAD6, Warm White F7EDE4, Deep Purple 342649,
+# Blue 284FA0, Red D14633, Yellow ECA91C. Text/background pairs used here are
+# on the guide's ADA-approved list: Cream/Purple (main) and Teal/Purple (sidebar).
 [theme]
 base = "light"
+backgroundColor = "#F7EDE4"            # Warm White
+textColor = "#342649"                  # Deep Purple
+primaryColor = "#284FA0"               # Blue: buttons, focus, accents
+linkColor = "#284FA0"
+secondaryBackgroundColor = "#FFFFFF"   # chat input and widgets
+blueColor = "#284FA0"                  # st.info boxes (the disclaimer)
+redColor = "#D14633"                   # st.error boxes
+yellowColor = "#ECA91C"                # st.warning boxes
+# Brand fonts are Freight Text Pro (headlines) and Articulat CF (body); the
+# guide's standard fallbacks are Georgia and Arial.
+headingFont = "Georgia, serif"
+font = "Arial, sans-serif"
+# Applied to the Vega-Lite charts Cortex returns.
+chartCategoricalColors = ["#284FA0", "#D14633", "#ECA91C", "#342649", "#9ED4D5", "#DDBAD6"]
+chartSequentialColors = ["#9ED4D5", "#84B6C9", "#6A99BD", "#4F7BB2", "#355EA6",
+                         "#294A96", "#2C4183", "#2F3870", "#312F5C", "#342649"]
+
+[theme.sidebar]
+backgroundColor = "#9ED4D5"            # Teal
+textColor = "#342649"                  # Deep Purple
+secondaryBackgroundColor = "#F7EDE4"   # passphrase box
+primaryColor = "#342649"
 
 [browser]
 gatherUsageStats = false
