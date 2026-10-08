@@ -19,7 +19,7 @@ import logging
 import streamlit as st
 
 log = logging.getLogger("cu_oracle")
-CONTACT = "pledin@americascreditunions.org"
+CONTACT = "custat@americascreditunions.org"
 
 
 def _groups():

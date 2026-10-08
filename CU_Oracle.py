@@ -19,6 +19,14 @@ WAREHOUSE = "STREAMLIT_WH"          # warehouse Cortex uses to run its queries
 ORCHESTRATION_MODEL = "auto"        # or pin a model, e.g. "claude-sonnet-4-5"
 IMAGE_PATH = Path(__file__).parent / "assets" / "Socrates.png"
 MAX_HISTORY_MESSAGES = 10           # prior chat messages sent back for follow-up context
+SUPPORT_EMAIL = auth.CONTACT
+
+DISCLAIMER = (
+    "The CU Oracle is configured to answer your questions using only America's Credit "
+    "Unions' internally curated datasets, but AI can and does make mistakes. If the Oracle "
+    "can't answer your question, or you need a person to confirm an answer it gave, contact "
+    f"[{SUPPORT_EMAIL}](mailto:{SUPPORT_EMAIL})."
+)
 
 RESPONSE_INSTRUCTIONS = """You are the Credit Union Oracle, an expert on US credit unions and an
 enthusiastic advocate for credit unions and cooperative finance.
@@ -156,6 +164,7 @@ def main():
     st.caption("Brought to You by America's Credit Unions. Powered by Snowflake Cortex.")
     if IMAGE_PATH.exists():
         st.image(str(IMAGE_PATH), width=300)
+    st.info(DISCLAIMER, icon="ℹ️")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -199,7 +208,7 @@ def main():
             except Exception as e:
                 auth.log.exception("Oracle request failed")
                 st.error(f"The Oracle could not answer that one. Please try again, or contact "
-                         f"{auth.CONTACT} if it keeps happening.\n\nDetails: {e}")
+                         f"{SUPPORT_EMAIL} if it keeps happening.\n\nDetails: {e}")
                 st.session_state.messages.pop()  # don't keep an unanswered question in history
                 return
         st.session_state.messages.append({"role": "assistant", "text": answer["text"], "answer": answer})
