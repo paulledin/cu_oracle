@@ -164,7 +164,6 @@ def main():
     st.caption("Brought to You by America's Credit Unions. Powered by Snowflake Cortex.")
     if IMAGE_PATH.exists():
         st.image(str(IMAGE_PATH), width=300)
-    st.info(DISCLAIMER, icon="ℹ️")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -172,6 +171,8 @@ def main():
     if not auth.login_sidebar():
         st.info("Sign in with your passphrase in the sidebar to consult the Oracle.")
         return
+
+    st.info(DISCLAIMER, icon="ℹ️")
 
     if st.sidebar.button("New conversation", width="stretch"):
         st.session_state.messages = []
