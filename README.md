@@ -20,6 +20,24 @@ instruction constants at the top of `CU_Oracle.py`.
 | `auth.py` | Passphrase groups from Streamlit secrets |
 | `assets/Socrates.png` | Header image |
 | `.streamlit/secrets.toml.example` | Secrets template (groups + Snowflake connection) |
+| `snowflake/cu_oracle_semantic.sql` | Semantic view definition (source of truth; run as SYSADMIN) |
+| `snowflake/ncua_financials_history.sql` | Procedure + daily task that rebuild the five-year quarterly NCUA history table |
+
+## Data
+
+The semantic view covers three tables in `CU_ORACLE_AGENT_DB.ANALYTICS`:
+
+- `CU_ORACLE_LIVE` - credit union names, contacts, status, leagues (NIMBLE).
+- `NCUA_FINANCIALS_HISTORY` - NCUA call report financials, one row per credit
+  union per quarter for the latest 21 quarters (five years plus the matching
+  quarter five years back). Includes year-to-date, quarterly, and annualized
+  income and charge-offs, ratios (`_PCT`), and year-over-year growth. Rebuilt by
+  `REFRESH_NCUA_FINANCIALS_HISTORY`, which a daily 6am ET task runs; it only
+  rebuilds when a newer `NCUA_DATA.FINANCIALS.NCUA_FINANCIALS_YYYYMM` table exists.
+- `CURRENT_NCUA_BRANCH_FILE` - NCUA branch locations.
+
+Schema future grants give `CU_ORACLE_APP_READ` access to anything (re)created in
+`ANALYTICS`, so rebuilds don't break the app.
 
 ## Deployment (Streamlit Community Cloud)
 
