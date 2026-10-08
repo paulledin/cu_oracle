@@ -22,6 +22,8 @@ instruction constants at the top of `CU_Oracle.py`.
 | `.streamlit/secrets.toml.example` | Secrets template (groups + Snowflake connection) |
 | `snowflake/cu_oracle_semantic.sql` | Semantic view definition (source of truth; run as SYSADMIN) |
 | `snowflake/ncua_financials_history.sql` | Procedure + daily task that rebuild the five-year quarterly NCUA history table |
+| `snowflake/cu_oracle_live.sql` | `CU_ORACLE_LIVE` dynamic table (from `ACUS_DATA.CORE_DATA`) |
+| `snowflake/current_ncua_branch_file.sql` | `CURRENT_NCUA_BRANCH_FILE` dynamic table (latest NCUA branch file) |
 
 ## Data
 
@@ -34,7 +36,9 @@ The semantic view covers three tables in `CU_ORACLE_AGENT_DB.ANALYTICS`:
   income and charge-offs, ratios (`_PCT`), and year-over-year growth. Rebuilt by
   `REFRESH_NCUA_FINANCIALS_HISTORY`, which a daily 6am ET task runs; it only
   rebuilds when a newer `NCUA_DATA.FINANCIALS.NCUA_FINANCIALS_YYYYMM` table exists.
-- `CURRENT_NCUA_BRANCH_FILE` - NCUA branch locations.
+- `CURRENT_NCUA_BRANCH_FILE` - NCUA branch locations, current quarter only (the
+  quarterly branch files are still a work in progress, so there is no branch
+  history yet). Branch counts come from `CU_ORACLE_LIVE.BRANCHES`.
 
 Schema future grants give `CU_ORACLE_APP_READ` access to anything (re)created in
 `ANALYTICS`, so rebuilds don't break the app.

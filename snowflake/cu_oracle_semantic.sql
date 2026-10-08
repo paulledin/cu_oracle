@@ -23,6 +23,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.JOIN_NUMBER as JOIN_NUMBER comment='The National Credit Union Administration (NCUA) assigned unique ID for joining NCUA call report data across time periods.' sample_values ('9531', '20759', '537'),
 		CU_ORACLE_LIVE.LAST_REPORTED_ASSETS as LAST_REPORTED_ASSETS comment='The credit union''s most recently National Credit Union Administration (NCUA) reported total assets, account code 010.' sample_values ('4604340', '229977718', '175586733'),
 		CU_ORACLE_LIVE.LAST_REPORTED_MEMBERS as LAST_REPORTED_MEMBERS comment='The credit union''s most recently National Credit Union Administration (NCUA) member count, account code 083.' sample_values ('3602', '3489', '5801'),
+		CU_ORACLE_LIVE.BRANCHES as BRANCHES comment='The credit union''s current number of offices, including its main office, as recorded by America''s Credit Unions. Use for how many branches or offices a credit union (or a group of credit unions) has.' sample_values ('1', '11', '388'),
 		NCUA_FINANCIALS_HISTORY.LATEST_PERIOD labels = (filter) as is_latest_period comment='Filters to the most recent quarter of NCUA financial data. Apply whenever a question asks for current, latest, or most recent financials, or does not mention a time period, trend, or growth.',
 		NCUA_FINANCIALS_HISTORY.JOIN_NUMBER as JOIN_NUMBER comment='The NCUA assigned unique ID for joining NCUA call report data across time periods.',
 		NCUA_FINANCIALS_HISTORY.CHARTER_NUMBER as CHARTER_NUMBER comment='The NCUA charter number (same as FCHT) as reported for this quarter.',
@@ -117,6 +118,7 @@ NCUA_FINANCIALS_HISTORY has one row per credit union per quarter. Unless the que
 Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year.
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
 When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
+For how many branches or offices a credit union has, use CU_ORACLE_LIVE.BRANCHES. Use CURRENT_NCUA_BRANCH_FILE for branch locations, addresses, hours, and services (ATM, drive-through); it is current only, so there is no branch history.
 For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.'
 	ai_question_categorization 'Dismissively reject any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. '
 	ai_verified_queries (
