@@ -45,7 +45,7 @@ def login_sidebar():
     """Render the sidebar login / logout. Returns the group dict or None."""
     group = current_group()
     if group:
-        st.sidebar.success(f"Signed in: **{group['label']}**")
+        st.sidebar.info(f"Signed in: **{group['label']}**", icon=":material/check_circle:")  # info = brand Blue (theme blueColor)
         if st.sidebar.button("Sign out", width="stretch"):
             del st.session_state["group"]
             st.session_state.messages = []
