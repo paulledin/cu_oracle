@@ -1,6 +1,7 @@
 -- CU_ORACLE_SEMANTIC: the only data source the CU Oracle's Cortex Agent can use.
 -- 2026-10-08: CURRENT_NCUA_FINANCIALS_FILE (latest quarter only) replaced by
 -- NCUA_FINANCIALS_HISTORY (one row per credit union per quarter, five years).
+-- 2026-10-08: merger flags, acquired balances, and organic growth columns added.
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -53,7 +54,13 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.LOANS_YOY_GROWTH_PCT as LOANS_YOY_GROWTH_PCT comment='Percent change in total loans from the same quarter one year earlier.',
 		NCUA_FINANCIALS_HISTORY.SHARES_YOY_GROWTH_PCT as SHARES_YOY_GROWTH_PCT comment='Percent change in total shares and deposits from the same quarter one year earlier.',
 		NCUA_FINANCIALS_HISTORY.MEMBERS_YOY_GROWTH_PCT as MEMBERS_YOY_GROWTH_PCT comment='Percent change in members from the same quarter one year earlier.',
-		NCUA_FINANCIALS_HISTORY.NET_WORTH_YOY_GROWTH_PCT as NET_WORTH_YOY_GROWTH_PCT comment='Percent change in net worth from the same quarter one year earlier.'
+		NCUA_FINANCIALS_HISTORY.NET_WORTH_YOY_GROWTH_PCT as NET_WORTH_YOY_GROWTH_PCT comment='Percent change in net worth from the same quarter one year earlier.',
+		NCUA_FINANCIALS_HISTORY.MERGERS_IN_QUARTER as MERGERS_IN_QUARTER comment='Number of credit unions merged into this credit union during this quarter.',
+		NCUA_FINANCIALS_HISTORY.MERGERS_PRIOR_YEAR as MERGERS_PRIOR_YEAR comment='Number of credit unions merged into this credit union in the 12 months ending at this quarter end.',
+		NCUA_FINANCIALS_HISTORY.ACQUIRED_ASSETS_PRIOR_YEAR as ACQUIRED_ASSETS_PRIOR_YEAR comment='Total assets, in dollars, of the credit unions merged into this credit union in the prior 12 months, as of each merged credit union''s last call report.',
+		NCUA_FINANCIALS_HISTORY.ACQUIRED_MEMBERS_PRIOR_YEAR as ACQUIRED_MEMBERS_PRIOR_YEAR comment='Members of the credit unions merged into this credit union in the prior 12 months, as of each merged credit union''s last call report.',
+		NCUA_FINANCIALS_HISTORY.ORGANIC_ASSETS_YOY_GROWTH_PCT as ORGANIC_ASSETS_YOY_GROWTH_PCT comment='Organic (pro forma) year-over-year asset growth: total assets now vs the combined assets one year earlier of this credit union plus any credit unions merged into it in the prior 12 months. Equals ASSETS_YOY_GROWTH_PCT when there was no merger.',
+		NCUA_FINANCIALS_HISTORY.ORGANIC_MEMBERS_YOY_GROWTH_PCT as ORGANIC_MEMBERS_YOY_GROWTH_PCT comment='Organic (pro forma) year-over-year member growth: members now vs the combined members one year earlier of this credit union plus any credit unions merged into it in the prior 12 months. Equals MEMBERS_YOY_GROWTH_PCT when there was no merger.'
 	)
 	dimensions (
 		CURRENT_NCUA_BRANCH_FILE.ATM as ATM comment='Indicates whether an automated teller machine (ATM) is present at the branch location.' sample_values ('No', 'Yes'),
@@ -92,6 +99,8 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.PERIOD_DATE as PERIOD_DATE comment='Quarter-end date of the NCUA call report (March 31, June 30, September 30, or December 31). Use for time series and trends.',
 		NCUA_FINANCIALS_HISTORY.PERIOD as PERIOD comment='Quarter of the NCUA call report as YYYYMM text, e.g. 202606 for June 2026.' sample_values ('202606', '202512', '202306'),
 		NCUA_FINANCIALS_HISTORY.IS_LATEST_PERIOD as IS_LATEST_PERIOD comment='TRUE for rows in the most recent quarter available.',
+		NCUA_FINANCIALS_HISTORY.MERGER_IN_QUARTER as MERGER_IN_QUARTER comment='TRUE if at least one credit union merged into this credit union during this quarter.',
+		NCUA_FINANCIALS_HISTORY.MERGER_IN_PRIOR_YEAR as MERGER_IN_PRIOR_YEAR comment='TRUE if at least one credit union merged into this credit union in the 12 months ending at this quarter end, so its year-over-year growth includes acquired balances.',
 		NCUA_FINANCIALS_HISTORY.CHARTERSTATE as CHARTERSTATE comment='The state in which the credit union charter was issued.' sample_values ('LA', 'TX', 'CT'),
 		NCUA_FINANCIALS_HISTORY.NIMBLE_CUNA_ID as NIMBLE_CUNA_ID comment='America''s Credit Unions identifier for the credit union (CUNA ID).' sample_values ('10018582', '10013786', '10028304')
 	)
@@ -107,6 +116,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 NCUA_FINANCIALS_HISTORY has one row per credit union per quarter. Unless the question asks about a specific past period, a trend, a change over time, or growth, filter it to IS_LATEST_PERIOD = TRUE. Never sum balance amounts (assets, loans, shares, net worth, members, employees) across quarters; for totals over time, group by PERIOD_DATE.
 Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year.
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
+When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
 For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.'
 	ai_question_categorization 'Dismissively reject any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. '
 	ai_verified_queries (

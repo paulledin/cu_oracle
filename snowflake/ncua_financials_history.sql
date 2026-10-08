@@ -12,6 +12,12 @@
 --   * Ratio columns ending _PCT are percentages (11.4 = 11.4%).
 --   * ROA and the net charge-off rate use the average of the current balance and
 --     the prior year-end balance (an approximation of NCUA's average assets/loans).
+--   * Mergers come from ACUS_DATA.CORE_DATA.CORE_DATA (status 'M', SURVIVOR_ID,
+--     STATUS_CHG_DATE). MERGER_IN_PRIOR_YEAR / MERGERS_PRIOR_YEAR cover mergers
+--     into this credit union in the 12 months ending PERIOD_DATE; acquired assets
+--     and members are each merged credit union's balances at its last call
+--     report. ORGANIC_ growth is pro forma: this quarter vs the combined size a
+--     year earlier of this credit union plus the credit unions it absorbed.
 --   * The build reads 4 extra quarters so every kept quarter has a year-ago value
 --     and a prior year-end value; only the latest N quarters are kept.
 --
@@ -94,6 +100,45 @@ BEGIN
             PART_TIME_EMPLOYEES
         FROM CU_ORACLE_AGENT_DB.ANALYTICS.NCUA_HIST_RAW
     ),
+    -- Mergers from ACUS_DATA.CORE_DATA (authoritative merger source): each merged
+    -- credit union, its survivor, and its size at its last call report.
+    mergers AS (
+        SELECT
+            c.NIMBLE_CUNA_ID::STRING                      AS TARGET_ID,
+            c.SURVIVOR_ID::STRING                         AS SURVIVOR_ID,
+            TRY_TO_DATE(c.STATUS_CHG_DATE::STRING)        AS MERGER_DATE
+        FROM ACUS_DATA.CORE_DATA.CORE_DATA c
+        WHERE c.STATUS = 'M'
+          AND c.SURVIVOR_ID IS NOT NULL
+          AND TRY_TO_DATE(c.STATUS_CHG_DATE::STRING) IS NOT NULL
+    ),
+    targets AS (
+        SELECT m.TARGET_ID, m.SURVIVOR_ID, m.MERGER_DATE,
+               t.TOTAL_ASSETS AS TARGET_ASSETS, t.MEMBERS AS TARGET_MEMBERS
+        FROM mergers m
+        LEFT JOIN base t ON t.NIMBLE_CUNA_ID = m.TARGET_ID AND t.PERIOD_DATE <= m.MERGER_DATE
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY m.TARGET_ID ORDER BY t.PERIOD_DATE DESC NULLS LAST) = 1
+    ),
+    merger_flags AS (
+        SELECT
+            b.JOIN_NUMBER,
+            b.PERIOD_DATE,
+            COUNT_IF(tg.MERGER_DATE > LAST_DAY(DATEADD(month, -3, b.PERIOD_DATE))) AS MERGERS_IN_QUARTER,
+            COUNT(*)                                    AS MERGERS_PRIOR_YEAR,
+            SUM(COALESCE(tg.TARGET_ASSETS, 0))          AS ACQUIRED_ASSETS_PRIOR_YEAR,
+            SUM(COALESCE(tg.TARGET_MEMBERS, 0))         AS ACQUIRED_MEMBERS_PRIOR_YEAR,
+            -- Merged credit unions' balances one year before this quarter (falling
+            -- back to their last report), for pro forma (organic) growth.
+            SUM(COALESCE(ty.TOTAL_ASSETS, tg.TARGET_ASSETS, 0)) AS ACQUIRED_ASSETS_YEAR_AGO,
+            SUM(COALESCE(ty.MEMBERS, tg.TARGET_MEMBERS, 0))     AS ACQUIRED_MEMBERS_YEAR_AGO
+        FROM base b
+        JOIN targets tg ON tg.SURVIVOR_ID = b.NIMBLE_CUNA_ID
+                       AND tg.MERGER_DATE >  DATEADD(year, -1, b.PERIOD_DATE)
+                       AND tg.MERGER_DATE <= b.PERIOD_DATE
+        LEFT JOIN base ty ON ty.NIMBLE_CUNA_ID = tg.TARGET_ID
+                         AND ty.PERIOD_DATE = DATEADD(year, -1, b.PERIOD_DATE)
+        GROUP BY b.JOIN_NUMBER, b.PERIOD_DATE
+    ),
     calc AS (
         SELECT
             b.*,
@@ -112,8 +157,16 @@ BEGIN
             ya.AMT_TOTAL_LOANS                AS YA_LOANS,
             ya.AMT_TOTAL_SHARES_AND_DEPOSITS  AS YA_SHARES,
             ya.MEMBERS                        AS YA_MEMBERS,
-            ya.NET_WORTH                      AS YA_NET_WORTH
+            ya.NET_WORTH                      AS YA_NET_WORTH,
+            COALESCE(mf.MERGERS_IN_QUARTER, 0)          AS MERGERS_IN_QUARTER,
+            COALESCE(mf.MERGERS_PRIOR_YEAR, 0)          AS MERGERS_PRIOR_YEAR,
+            COALESCE(mf.ACQUIRED_ASSETS_PRIOR_YEAR, 0)  AS ACQUIRED_ASSETS_PRIOR_YEAR,
+            COALESCE(mf.ACQUIRED_MEMBERS_PRIOR_YEAR, 0) AS ACQUIRED_MEMBERS_PRIOR_YEAR,
+            COALESCE(mf.ACQUIRED_ASSETS_YEAR_AGO, 0)    AS ACQUIRED_ASSETS_YEAR_AGO,
+            COALESCE(mf.ACQUIRED_MEMBERS_YEAR_AGO, 0)   AS ACQUIRED_MEMBERS_YEAR_AGO
         FROM base b
+        LEFT JOIN merger_flags mf ON mf.JOIN_NUMBER = b.JOIN_NUMBER
+                                 AND mf.PERIOD_DATE = b.PERIOD_DATE
         LEFT JOIN base pq ON pq.JOIN_NUMBER = b.JOIN_NUMBER
                          AND pq.PERIOD_DATE = LAST_DAY(DATEADD(month, -3, b.PERIOD_DATE))
         LEFT JOIN base pd ON pd.JOIN_NUMBER = b.JOIN_NUMBER
@@ -157,7 +210,15 @@ BEGIN
         ROUND((AMT_TOTAL_LOANS / NULLIF(YA_LOANS, 0) - 1) * 100, 4)            AS LOANS_YOY_GROWTH_PCT,
         ROUND((AMT_TOTAL_SHARES_AND_DEPOSITS / NULLIF(YA_SHARES, 0) - 1) * 100, 4) AS SHARES_YOY_GROWTH_PCT,
         ROUND((MEMBERS / NULLIF(YA_MEMBERS, 0) - 1) * 100, 4)                  AS MEMBERS_YOY_GROWTH_PCT,
-        ROUND((NET_WORTH / NULLIF(YA_NET_WORTH, 0) - 1) * 100, 4)              AS NET_WORTH_YOY_GROWTH_PCT
+        ROUND((NET_WORTH / NULLIF(YA_NET_WORTH, 0) - 1) * 100, 4)              AS NET_WORTH_YOY_GROWTH_PCT,
+        MERGERS_IN_QUARTER > 0                                                 AS MERGER_IN_QUARTER,
+        MERGERS_IN_QUARTER,
+        MERGERS_PRIOR_YEAR > 0                                                 AS MERGER_IN_PRIOR_YEAR,
+        MERGERS_PRIOR_YEAR,
+        ACQUIRED_ASSETS_PRIOR_YEAR,
+        ACQUIRED_MEMBERS_PRIOR_YEAR,
+        ROUND((TOTAL_ASSETS / NULLIF(YA_ASSETS + ACQUIRED_ASSETS_YEAR_AGO, 0) - 1) * 100, 4) AS ORGANIC_ASSETS_YOY_GROWTH_PCT,
+        ROUND((MEMBERS / NULLIF(YA_MEMBERS + ACQUIRED_MEMBERS_YEAR_AGO, 0) - 1) * 100, 4)   AS ORGANIC_MEMBERS_YOY_GROWTH_PCT
     FROM calc
     WHERE PERIOD_RANK <= :N_QUARTERS
     ORDER BY JOIN_NUMBER, PERIOD_DATE;
