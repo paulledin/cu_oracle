@@ -21,6 +21,7 @@ IMAGE_PATH = Path(__file__).parent / "assets" / "Socrates.png"
 LOGO = "https://raw.githubusercontent.com/paulledin/data/master/ACUS.jpg"  # same logo as the CRANA app
 MAX_HISTORY_MESSAGES = 10           # prior chat messages sent back for follow-up context
 SUPPORT_EMAIL = auth.CONTACT
+DEFAULT_QUESTION = "Explain the DataSet."  # suggested when a conversation is empty
 
 DISCLAIMER = (
     "The CU Oracle is configured to answer your questions using only America's Credit "
@@ -194,9 +195,14 @@ def main():
                     for j, q in enumerate(msg["answer"]["suggestions"]):
                         st.button(q, key=f"suggest_{i}_{j}", on_click=queue_question, args=(q,))
 
+    # st.chat_input is pinned to the bottom of the page wherever it is called.
     prompt = st.chat_input("Ask the CU Oracle about US credit unions...")
     prompt = prompt or st.session_state.pop("queued_prompt", None)
     if not prompt:
+        if not st.session_state.messages:
+            st.caption("Not sure where to start? Try:")
+            st.button(DEFAULT_QUESTION, key="suggest_default", on_click=queue_question,
+                      args=(DEFAULT_QUESTION,))
         return
 
     history = list(st.session_state.messages)
