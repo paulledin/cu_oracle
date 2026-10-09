@@ -21,7 +21,7 @@ IMAGE_PATH = Path(__file__).parent / "assets" / "Socrates.png"
 LOGO = "https://raw.githubusercontent.com/paulledin/data/master/ACUS.jpg"  # same logo as the CRANA app
 MAX_HISTORY_MESSAGES = 10           # prior chat messages sent back for follow-up context
 SUPPORT_EMAIL = auth.CONTACT
-DEFAULT_QUESTION = "Explain the DataSet."  # suggested when a conversation is empty
+DEFAULT_QUESTION = "What kinds of questions can you answer?"  # suggested when a conversation is empty
 
 DISCLAIMER = (
     "The CU Oracle is configured to answer your questions using only America's Credit "
