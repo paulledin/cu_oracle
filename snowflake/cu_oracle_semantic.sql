@@ -76,10 +76,10 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CURRENT_NCUA_BRANCH_FILE.PHYSICALADDRESSSTATECODE as PHYSICALADDRESSSTATECODE comment='The two-letter state code associated with the physical address of the branch.' sample_values ('MS', 'LA', 'IA'),
 		CURRENT_NCUA_BRANCH_FILE.SITENAME as SITENAME comment='The name of the credit union branch or site location.' sample_values ('MORRIS SHEPPARD TEXARKANA FCU', 'New Haven Teachers FCU Main Office', 'RED RIVER FCU'),
 		CURRENT_NCUA_BRANCH_FILE.SITETYPENAME as SITETYPENAME comment='The name of the site type classification for a branch location.' sample_values ('Corporate Office', 'Branch Office'),
-		CU_ORACLE_LIVE.AFL as AFL comment='Affiliation status of the credit union. A=Affiliated, N=Not Affiliated.' sample_values ('N', 'A'),
+		CU_ORACLE_LIVE.AFL as AFL comment='Affiliation status of the credit union with America''s Credit Unions (ACUs) i.e. is the credit union currently affiliated with America''s Credit Unions (ACUs). A=Affiliated, N=Not Affiliated.' sample_values ('N', 'A'),
 		CU_ORACLE_LIVE.CEO_FULL_NAME as CEO_FULL_NAME comment='The full name of the chief executive officer.' sample_values ('Steven Shaffner', 'Pamela Goodman', 'Patrick Gallagher'),
 		CU_ORACLE_LIVE.LAST_PERIOD_REPORTED as LAST_PERIOD_REPORTED comment='The date of the last period for which the credit union has submitted 5300 Call Report data to the National Credit Union Administration (NCUA).' sample_values ('2025-12-31', '2025-06-30', '2012-09-30'),
-		CU_ORACLE_LIVE.LEAGUE_AFFILIATED as LEAGUE_AFFILIATED comment='The state league affiliation of the credit union. A=League Affiliated, N=Not League Affiliated.' sample_values ('United States', 'Panama'),
+		CU_ORACLE_LIVE.LEAGUE_AFFILIATED as LEAGUE_AFFILIATED comment='Affiliation status of the credit union with their state credit union league i.e. is the credit union currently affiliated with its state league. A=Affiliated, N=Not Affiliated.' sample_values ('A', 'N'),
 		CU_ORACLE_LIVE.LEAGUE_NAME as LEAGUE_NAME comment='The name of the state credit union league which the credit union belongs to, or would belong to if they were affiliated.' sample_values ('Tennessee League and Mississippi Credit Union Association', 'Illinois Credit Union League', 'CrossState Credit Union Association'),
 		CU_ORACLE_LIVE.NAME as NAME comment='The name of a credit union.' sample_values ('St Mark CU', 'Great Neck School EFCU', 'Molokai Community FCU'),
 		CU_ORACLE_LIVE.NIMBLE_CUNA_ID as NIMBLE_CUNA_ID comment='A unique identifier assigned by America''s Credit Unions (ACUs), formally known as the CUNA ID or CUID.' sample_values ('10027773', '10018610', '10024555'),
@@ -119,8 +119,9 @@ Net income and net charge-offs are reported year-to-date: use the _QTR columns f
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
 When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
 For how many branches or offices a credit union has, use CU_ORACLE_LIVE.BRANCHES. Use CURRENT_NCUA_BRANCH_FILE for branch locations, addresses, hours, and services (ATM, drive-through); it is current only, so there is no branch history.
-For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.'
-	ai_question_categorization 'Dismissively reject any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. '
+For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.
+For any question about affiliation, return AFL (affiliation with America''s Credit Unions) and LEAGUE_AFFILIATED (affiliation with the state league) as separate columns, America''s Credit Unions affiliation first; never combine or substitute one for the other.'
+	ai_question_categorization 'Dismissively reject, in a humorous way, any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. Affiliation status with America''s Credit Unions (ACUs) is distinct from league affiliation and should always be reported separately with an emphasis on America''s Credit Unions Affiliation.'
 	ai_verified_queries (
 		"Who is the CEO of Heartland Credit Union in Madison Wisconsin?" AS (
 QUESTION 'Who is the CEO of Heartland Credit Union in Madison Wisconsin?'
