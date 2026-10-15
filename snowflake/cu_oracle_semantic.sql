@@ -4,6 +4,7 @@
 -- 2026-10-08: merger flags, acquired balances, and organic growth columns added.
 -- 2026-10-15: clarified LAST_REPORTED_ fields (any credit union back to 1994) vs
 -- NCUA_FINANCIALS_HISTORY (latest five years), with a routing rule and example.
+-- 2026-10-15: SURVIVOR_ and CURRENT_SUCCESSOR_ merger fields on CU_ORACLE_LIVE.
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -98,6 +99,10 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, L=Liquidated, I=Inactive' sample_values ('M', 'L', 'A'),
 		CU_ORACLE_LIVE.STATUS_CHG_DATE as STATUS_CHG_DATE comment='The date on which the status was last changed.' sample_values ('1949-07-11', '1950-12-08', '1953-11-20'),
 		CU_ORACLE_LIVE.TOM_CODE as TOM_CODE comment='Type of Membership (TOM) code, also known as Field of Membership (FOM) code.' sample_values ('00', '01', '36'),
+		CU_ORACLE_LIVE.SURVIVOR_ID as SURVIVOR_ID comment='For a merged credit union (STATUS = M), the NIMBLE_CUNA_ID of the credit union it merged into directly. Empty for credit unions that have not merged.',
+		CU_ORACLE_LIVE.SURVIVOR_NAME as SURVIVOR_NAME comment='For a merged credit union, the name of the credit union it merged into directly (the survivor of that merger).' sample_values ('SchoolsFirst FCU', 'Gesa CU', 'Midwest United CU'),
+		CU_ORACLE_LIVE.CURRENT_SUCCESSOR_ID as CURRENT_SUCCESSOR_ID comment='For a merged credit union, the NIMBLE_CUNA_ID of the credit union it is part of today, following any later mergers of its survivor. Equals SURVIVOR_ID when the survivor has not itself merged.',
+		CU_ORACLE_LIVE.CURRENT_SUCCESSOR_NAME as CURRENT_SUCCESSOR_NAME comment='For a merged credit union, the name of the credit union it is part of today, following any later mergers of its survivor (e.g., Teachers CU merged into Midwest United CU, which later merged into CommunityAmerica, so its current successor is CommunityAmerica).' sample_values ('CommunityAmerica Credit Union', 'TDECU', 'Vibrant CU'),
 		CU_ORACLE_LIVE.WEB as WEB comment='The website of the credit union.' sample_values ('www.lmhospcu.com', 'www.educationpersonnelfcu.com', 'www.greatplainsfcu.com'),
 		NCUA_FINANCIALS_HISTORY.PERIOD_DATE as PERIOD_DATE comment='Quarter-end date of the NCUA call report (March 31, June 30, September 30, or December 31). Use for time series and trends.',
 		NCUA_FINANCIALS_HISTORY.PERIOD as PERIOD comment='Quarter of the NCUA call report as YYYYMM text, e.g. 202606 for June 2026.' sample_values ('202606', '202512', '202306'),
@@ -123,6 +128,7 @@ When reporting or ranking a credit union''s asset or member growth, check MERGER
 For how many branches or offices a credit union has, use CU_ORACLE_LIVE.BRANCHES. Use CURRENT_NCUA_BRANCH_FILE for branch locations, addresses, hours, and services (ATM, drive-through); it is current only, so there is no branch history.
 For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.
 Assets and members come from two places. NCUA_FINANCIALS_HISTORY has every quarter for the latest five years; use it for active credit unions and for anything over time. CU_ORACLE_LIVE.LAST_REPORTED_ASSETS and LAST_REPORTED_MEMBERS hold one figure per credit union from its final or most recent call report, back to 1994; use them for merged, liquidated, or inactive credit unions, or any credit union with no rows in NCUA_FINANCIALS_HISTORY. Whenever you report a LAST_REPORTED_ figure, also return LAST_PERIOD_REPORTED and state that date, and do not add up or rank LAST_REPORTED_ figures with different dates without saying so.
+For who a credit union merged into, report SURVIVOR_NAME and, if different, CURRENT_SUCCESSOR_NAME, with STATUS_CHG_DATE as the merger date. For which credit unions merged into a given credit union, match its NIMBLE_CUNA_ID against SURVIVOR_ID for direct mergers, or against CURRENT_SUCCESSOR_ID for every credit union that is now part of it (including through earlier mergers); say which one you used.
 For any question about affiliation, return AFL (affiliation with America''s Credit Unions) and LEAGUE_AFFILIATED (affiliation with the state league) as separate columns, America''s Credit Unions affiliation first; never combine or substitute one for the other.'
 	ai_question_categorization 'Dismissively reject, in a humorous way, any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. Affiliation status with America''s Credit Unions (ACUs) is distinct from league affiliation and should always be reported separately with an emphasis on America''s Credit Unions Affiliation.'
 	ai_verified_queries (
@@ -264,5 +270,27 @@ FROM
   cu_oracle_live
 WHERE
   LOWER(name) LIKE ''%schools financial%''
-  AND LOWER(st_city) = ''sacramento''')
+  AND LOWER(st_city) = ''sacramento'''),
+		"Which credit unions have merged into Gesa Credit Union?" AS (
+QUESTION 'Which credit unions have merged into Gesa Credit Union?'
+VERIFIED_AT 1792022400
+VERIFIED_BY 'Claude Code (for Paul Ledin)'
+ONBOARDING_QUESTION false
+SQL 'SELECT
+  m.name,
+  m.st_city,
+  m.st_state,
+  m.status_chg_date AS merger_date,
+  m.survivor_name,
+  m.last_period_reported,
+  m.last_reported_assets,
+  m.last_reported_members
+FROM
+  cu_oracle_live AS m
+  JOIN cu_oracle_live AS g ON m.survivor_id = g.nimble_cuna_id
+WHERE
+  LOWER(g.name) LIKE ''%gesa%''
+  AND g.status = ''A''
+ORDER BY
+  m.status_chg_date DESC')
 	);
