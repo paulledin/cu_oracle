@@ -9,6 +9,8 @@
 -- STATUS C = Conservatorship.
 -- 2026-10-15: default universe for aggregates = all credit unions that filed the
 -- latest call report (any status); affiliation questions = status A or P.
+-- 2026-10-15: state = charter state (CHARTERSTATE / CHARTER_STATE); employee
+-- questions report total and FTE (TOTAL_EMPLOYEES, FTE_EMPLOYEES).
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -48,6 +50,8 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.AMT_MEMBER_BUSINESS_LOANS as AMT_MEMBER_BUSINESS_LOANS comment='Total member business loans in dollars at quarter end.',
 		NCUA_FINANCIALS_HISTORY.FULL_TIME_EMPLOYEES as FULL_TIME_EMPLOYEES comment='Number of full-time employees at quarter end.',
 		NCUA_FINANCIALS_HISTORY.PART_TIME_EMPLOYEES as PART_TIME_EMPLOYEES comment='Number of part-time employees at quarter end.',
+		NCUA_FINANCIALS_HISTORY.TOTAL_EMPLOYEES as TOTAL_EMPLOYEES comment='Total employee headcount at quarter end: full-time plus part-time employees.',
+		NCUA_FINANCIALS_HISTORY.FTE_EMPLOYEES as FTE_EMPLOYEES comment='Full-time equivalent (FTE) employees at quarter end: full-time employees plus half of part-time employees (NCUA convention).',
 		NCUA_FINANCIALS_HISTORY.NET_INCOME_YTD as NET_INCOME_YTD comment='Net income year-to-date in dollars, as reported (cumulative from January 1 through the quarter end).',
 		NCUA_FINANCIALS_HISTORY.NET_INCOME_QTR as NET_INCOME_QTR comment='Net income earned in that quarter alone, in dollars.',
 		NCUA_FINANCIALS_HISTORY.NET_INCOME_ANNUALIZED as NET_INCOME_ANNUALIZED comment='Year-to-date net income annualized (YTD x 4 / quarter), in dollars. Use to compare income across quarters.',
@@ -97,11 +101,12 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.PHONE as PHONE comment='The credit union''s main/general purpose telephone number.' sample_values ('2034027400', '3525882732', '5855911055'),
 		CU_ORACLE_LIVE.PO_ADDRESS as PO_ADDRESS comment='The mailing address of the credit union.' sample_values ('221 Main St', 'PO Box 2028', '4400 Maplewood Dr'),
 		CU_ORACLE_LIVE.PO_CITY as PO_CITY comment='The city of the mailing address of the credit union.' sample_values ('Chicago', 'Santa Ana', 'Rochester'),
-		CU_ORACLE_LIVE.PO_STATE as PO_STATE comment='The two-letter state abbreviation of the mailing address of the credit union.' sample_values ('NY', 'IL', 'PA'),
+		CU_ORACLE_LIVE.PO_STATE as PO_STATE comment='The two-letter state abbreviation of the mailing address of the credit union. An address field only; for which state a credit union is in, use CHARTER_STATE.' sample_values ('NY', 'IL', 'PA'),
+		CU_ORACLE_LIVE.CHARTER_STATE as CHARTER_STATE comment='The state a credit union is headquartered in, by America''s Credit Unions convention: its NCUA charter state from its most recent call report (or its address state if it never filed one). Use for every question about which state a credit union is in or counts by state, even where it differs from the street address.' sample_values ('TX', 'CA', 'WI'),
 		CU_ORACLE_LIVE.PO_ZIP_CODE as PO_ZIP_CODE comment='The postal zip code of the mailing address of the credit union.' sample_values ('60619-1827', '14624-4537', '11354-3143'),
 		CU_ORACLE_LIVE.ST_ADDRESS as ST_ADDRESS comment='The physical/street address of the credit union.' sample_values ('2998 Chili Ave', '2514 N Main St', '15 Vanderbilt Ave Ste D41'),
 		CU_ORACLE_LIVE.ST_CITY as ST_CITY comment='The city of the physical/street address of the credit union.' sample_values ('Rochester', 'Boulder', 'Fort Wayne'),
-		CU_ORACLE_LIVE.ST_STATE as ST_STATE comment='The two-letter state abbreviation of the physical/mailing address of the credit union.' sample_values ('NY', 'PA', 'IL'),
+		CU_ORACLE_LIVE.ST_STATE as ST_STATE comment='The two-letter state abbreviation of the credit union''s physical street address. An address field only; for which state a credit union is in, use CHARTER_STATE (they differ for a few credit unions).' sample_values ('NY', 'PA', 'IL'),
 		CU_ORACLE_LIVE.ST_ZIP_CODE as ST_ZIP_CODE comment='The postal zip code of the physical/street address of the credit union.' sample_values ('12110-1007', '14624-4537', '92705-4934'),
 		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, L=Liquidated, I=Inactive, C=Conservatorship (operating under NCUA conservatorship; still files call reports)' sample_values ('M', 'L', 'A'),
 		CU_NAME_ALIASES.ALIAS as ALIAS comment='One name the credit union is or was known by, as written in its source.' sample_values ('PenFed', 'PENTAGON', 'Teachers Credit Union'),
@@ -122,7 +127,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.IS_LATEST_PERIOD as IS_LATEST_PERIOD comment='TRUE for rows in the most recent quarter available.',
 		NCUA_FINANCIALS_HISTORY.MERGER_IN_QUARTER as MERGER_IN_QUARTER comment='TRUE if at least one credit union merged into this credit union during this quarter.',
 		NCUA_FINANCIALS_HISTORY.MERGER_IN_PRIOR_YEAR as MERGER_IN_PRIOR_YEAR comment='TRUE if at least one credit union merged into this credit union in the 12 months ending at this quarter end, so its year-over-year growth includes acquired balances.',
-		NCUA_FINANCIALS_HISTORY.CHARTERSTATE as CHARTERSTATE comment='The state in which the credit union charter was issued.' sample_values ('LA', 'TX', 'CT'),
+		NCUA_FINANCIALS_HISTORY.CHARTERSTATE as CHARTERSTATE comment='The credit union''s charter state on that quarter''s call report. By America''s Credit Unions convention this is the state the credit union is headquartered in; use it for every state question about financials or counts, even where it differs from the street address.' sample_values ('LA', 'TX', 'CT'),
 		NCUA_FINANCIALS_HISTORY.NIMBLE_CUNA_ID as NIMBLE_CUNA_ID comment='America''s Credit Unions identifier for the credit union (CUNA ID).' sample_values ('10018582', '10013786', '10028304')
 	)
 	metrics (
@@ -140,6 +145,8 @@ NCUA_FINANCIALS_HISTORY has one row per credit union per quarter. Unless the que
 Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year.
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
 When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
+States: the state a credit union is in is always its charter state, never its address. Use NCUA_FINANCIALS_HISTORY.CHARTERSTATE with financial data and CU_ORACLE_LIVE.CHARTER_STATE otherwise (including affiliation questions); use ST_STATE, PO_STATE, and city only to describe an address or to identify a specific credit union the user describes by location.
+Employees: when a question asks about employees, staff, or headcount, give both total employees (TOTAL_EMPLOYEES, full-time plus part-time) and full-time equivalents (FTE_EMPLOYEES, full-time plus half of part-time), and say which is which; for thresholds (e.g. fewer than 10 employees) report the count under each measure. If the question asks specifically for FTEs, give only FTE_EMPLOYEES.
 For how many branches or offices a credit union has, use CU_ORACLE_LIVE.BRANCHES. Use CURRENT_NCUA_BRANCH_FILE for branch locations, addresses, hours, and services (ATM, drive-through); it is current only, so there is no branch history.
 For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.
 Assets and members come from two places. NCUA_FINANCIALS_HISTORY has every quarter for the latest five years; use it for any credit union that still reports and for anything over time. CU_ORACLE_LIVE.LAST_REPORTED_ASSETS and LAST_REPORTED_MEMBERS hold one figure per credit union from its final or most recent call report, back to 1994; use them for merged, liquidated, or inactive credit unions, or any credit union with no rows in NCUA_FINANCIALS_HISTORY. Whenever you report a LAST_REPORTED_ figure, also return LAST_PERIOD_REPORTED and state that date, and do not add up or rank LAST_REPORTED_ figures with different dates without saying so.
@@ -230,12 +237,12 @@ VERIFIED_BY 'Claude Code (for Paul Ledin)'
 ONBOARDING_QUESTION false
 SQL 'SELECT
   period_date,
-  COUNT(DISTINCT join_number) AS credit_unions
+  COUNT(DISTINCT IFF(total_employees < 10, join_number, NULL)) AS credit_unions_under_10_total_employees,
+  COUNT(DISTINCT IFF(fte_employees < 10, join_number, NULL)) AS credit_unions_under_10_fte_employees
 FROM
   ncua_financials_history
 WHERE
   is_latest_period
-  AND COALESCE(full_time_employees, 0) + COALESCE(part_time_employees, 0) < 10
 GROUP BY
   period_date'),
 		"What's the date of the current NCUA branch data?" AS (

@@ -9,6 +9,8 @@
 --                          used in the NCUA quarterly call reports (1994-present),
 --                          with the first and last quarter it appeared. Rebuilt by
 --                          REFRESH_CU_NAME_HISTORY when a new quarter is loaded.
+--   CU_NCUA_CHARTER_STATE  each credit union's charter state on its most recent
+--                          NCUA report (same procedure); CU_ORACLE_LIVE.CHARTER_STATE.
 --   CU_TRADE_NAMES         hand-maintained trade names and nicknames (owner:
 --                          Paul Ledin). Add rows with INSERT; see the examples.
 --   CU_NAME_ALIASES        view combining the current NIMBLE name, NCUA names
@@ -68,7 +70,7 @@ BEGIN
     FOR r IN c1 DO
         latest_period := RIGHT(r.TBL, 6);
         union_sql := union_sql || IFF(n_tables = 0, '', ' UNION ALL ') ||
-            'SELECT ''' || latest_period || ''' AS PERIOD, JOIN_NUMBER, CU_NAME, WEBSITE ' ||
+            'SELECT ''' || latest_period || ''' AS PERIOD, JOIN_NUMBER, CU_NAME, WEBSITE, CHARTERSTATE ' ||
             'FROM NCUA_DATA.FINANCIALS.' || r.TBL;
         n_tables := n_tables + 1;
     END FOR;
@@ -114,13 +116,26 @@ BEGIN
     FROM raw WHERE JOIN_NUMBER IS NOT NULL AND LENGTH(WEBSITE_NAME) >= 3
     GROUP BY 1, 2, 3;
 
+    -- Each credit union's charter state on its most recent report. INSERT OVERWRITE
+    -- (not CREATE OR REPLACE) keeps the table object stable for the CU_ORACLE_LIVE
+    -- dynamic table that joins to it.
+    CREATE TABLE IF NOT EXISTS CU_ORACLE_AGENT_DB.ANALYTICS.CU_NCUA_CHARTER_STATE (
+        JOIN_NUMBER NUMBER, CHARTER_STATE VARCHAR, AS_OF_PERIOD DATE)
+        COMMENT = 'Charter state from each credit union''s most recent NCUA call report. Built by REFRESH_CU_NAME_HISTORY.';
+    INSERT OVERWRITE INTO CU_ORACLE_AGENT_DB.ANALYTICS.CU_NCUA_CHARTER_STATE
+    SELECT TRY_TO_NUMBER(JOIN_NUMBER), NULLIF(TRIM(CHARTERSTATE), ''), LAST_DAY(TO_DATE(PERIOD, 'YYYYMM'))
+    FROM CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_RAW
+    WHERE TRY_TO_NUMBER(JOIN_NUMBER) IS NOT NULL AND NULLIF(TRIM(CHARTERSTATE), '') IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY TRY_TO_NUMBER(JOIN_NUMBER) ORDER BY PERIOD DESC) = 1;
+
     DROP TABLE IF EXISTS CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_RAW;
-    RETURN 'Rebuilt CU_NAME_HISTORY_NCUA through ' || latest_period || ' from ' || n_tables || ' quarterly tables.';
+    RETURN 'Rebuilt CU_NAME_HISTORY_NCUA and CU_NCUA_CHARTER_STATE through ' || latest_period || ' from ' || n_tables || ' quarterly tables.';
 END;
 $$;
 
 -- Build the history now if it is missing or behind (the daily task keeps it current).
 CALL CU_ORACLE_AGENT_DB.ANALYTICS.REFRESH_CU_NAME_HISTORY(FALSE);
+-- (After changing what the procedure builds, run it once with TRUE to force a rebuild.)
 
 -- Hand-maintained trade names and nicknames (owner: Paul Ledin). To add one:
 --   INSERT INTO CU_ORACLE_AGENT_DB.ANALYTICS.CU_TRADE_NAMES (NIMBLE_CUNA_ID, TRADE_NAME, NOTE)

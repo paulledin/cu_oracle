@@ -10,6 +10,8 @@
 --     quarter alone (YTD less the prior quarter's YTD, Q1 = YTD), and
 --     *_ANNUALIZED = YTD * 4 / QUARTER.
 --   * Ratio columns ending _PCT are percentages (11.4 = 11.4%).
+--   * TOTAL_EMPLOYEES = full-time + part-time headcount; FTE_EMPLOYEES = full-time
+--     + half of part-time (NCUA's full-time-equivalent convention).
 --   * ROA and the net charge-off rate use the average of the current balance and
 --     the prior year-end balance (an approximation of NCUA's average assets/loans).
 --   * Mergers come from ACUS_DATA.CORE_DATA.CORE_DATA (status 'M', SURVIVOR_ID,
@@ -193,6 +195,9 @@ BEGIN
         AMT_MEMBER_BUSINESS_LOANS,
         FULL_TIME_EMPLOYEES,
         PART_TIME_EMPLOYEES,
+        COALESCE(FULL_TIME_EMPLOYEES, 0) + COALESCE(PART_TIME_EMPLOYEES, 0)       AS TOTAL_EMPLOYEES,
+        -- NCUA convention: a part-time employee counts as half a full-time equivalent
+        COALESCE(FULL_TIME_EMPLOYEES, 0) + COALESCE(PART_TIME_EMPLOYEES, 0) * 0.5 AS FTE_EMPLOYEES,
         NET_INCOME_YTD,
         NET_INCOME_QTR,
         NET_INCOME_ANNUALIZED,
