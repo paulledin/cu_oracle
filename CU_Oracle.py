@@ -48,8 +48,10 @@ enthusiastic advocate for credit unions and cooperative finance.
 
 ORCHESTRATION_INSTRUCTIONS = """Always use the cu_oracle tool to answer questions about credit unions.
 The data covers US credit unions only: America's Credit Unions' directory and affiliation records,
-NCUA call report financials for the latest five years (plus each credit union's last reported assets
-and members back to 1994), mergers, names, and current branch locations. It does not include, for
+NCUA call report financials for the latest five years, including the full balance sheet and income
+statement used in America's Credit Unions' Credit Analysis reports (loan, share, and investment mix,
+delinquency buckets, income and expense lines), plus each credit union's last reported assets and
+members back to 1994, mergers, names, and current branch locations. It does not include, for
 example, loan or deposit rates, product details, fees, compensation, member demographics, news or
 events, or anything about banks.
 Before answering, decide whether the data can answer the question. If it cannot, tell the user so

@@ -11,6 +11,8 @@
 -- latest call report (any status); affiliation questions = status A or P.
 -- 2026-10-15: state = charter state (CHARTERSTATE / CHARTER_STATE); employee
 -- questions report total and FTE (TOTAL_EMPLOYEES, FTE_EMPLOYEES).
+-- 2026-10-15: Credit Analysis balance sheet and income statement line items;
+-- net worth ratio = NCUA PCA ratio; member business loans = net MBL balance.
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -44,10 +46,64 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.MEMBERS as MEMBERS comment='Number of members at quarter end.',
 		NCUA_FINANCIALS_HISTORY.TOTAL_ASSETS as TOTAL_ASSETS comment='Total assets in dollars at quarter end.',
 		NCUA_FINANCIALS_HISTORY.AMT_TOTAL_SHARES_AND_DEPOSITS as AMT_TOTAL_SHARES_AND_DEPOSITS comment='Total shares and deposits (member and nonmember savings) in dollars at quarter end.',
-		NCUA_FINANCIALS_HISTORY.NET_WORTH as NET_WORTH comment='Net worth (capital) in dollars at quarter end, as defined for NCUA prompt corrective action.',
-		NCUA_FINANCIALS_HISTORY.AMT_TOTAL_LOANS as AMT_TOTAL_LOANS comment='Total loans and leases in dollars at quarter end.',
-		NCUA_FINANCIALS_HISTORY.AMT_TOTAL_DELQ_LOANS as AMT_TOTAL_DELQ_LOANS comment='Total delinquent loans in dollars at quarter end.',
-		NCUA_FINANCIALS_HISTORY.AMT_MEMBER_BUSINESS_LOANS as AMT_MEMBER_BUSINESS_LOANS comment='Total member business loans in dollars at quarter end.',
+		NCUA_FINANCIALS_HISTORY.NET_WORTH as NET_WORTH comment='Net worth (capital) in dollars at quarter end, as defined for NCUA prompt corrective action. It is a regulatory measure, not the sum of the balance sheet''s equity lines: do not describe it as undivided earnings plus all other reserves.',
+		NCUA_FINANCIALS_HISTORY.AMT_TOTAL_LOANS as AMT_TOTAL_LOANS comment='Total loans and leases in dollars at quarter end, INCLUDING loans held for sale (NCUA definition). Use for loan totals and the loan-to-share and delinquency ratios. The Credit Analysis report''s "Total Loans" line excludes loans held for sale; that is LOANS_EXCL_HELD_FOR_SALE.',
+		NCUA_FINANCIALS_HISTORY.AMT_TOTAL_DELQ_LOANS as AMT_TOTAL_DELQ_LOANS comment='Total delinquent loans in dollars at quarter end (Credit Analysis "Total Delinquent Loans").',
+		NCUA_FINANCIALS_HISTORY.AMT_MEMBER_BUSINESS_LOANS as AMT_MEMBER_BUSINESS_LOANS comment='Net member business loan balance in dollars at quarter end (5300 account 400A): the statutory MBL measure, as on the Credit Analysis balance sheet.',
+		NCUA_FINANCIALS_HISTORY.CASH_AND_EQUIVALENTS as CASH_AND_EQUIVALENTS comment='Credit Analysis balance sheet: Cash and Equivalents, dollars at quarter end.',
+		NCUA_FINANCIALS_HISTORY.INVESTMENTS_AND_DEPOSITS as INVESTMENTS_AND_DEPOSITS comment='Credit Analysis balance sheet: Investments and Deposits (total investments), dollars at quarter end. NCUA redefined total investments in March 2022.',
+		NCUA_FINANCIALS_HISTORY.TOTAL_CASH_AND_INVESTMENTS as TOTAL_CASH_AND_INVESTMENTS comment='Credit Analysis balance sheet: Total Cash/Investments/Deposits = cash and equivalents + investments and deposits.',
+		NCUA_FINANCIALS_HISTORY.CREDIT_CARD_LOANS as CREDIT_CARD_LOANS comment='Credit Analysis balance sheet: Credit Cards (unsecured credit card loans), dollars.',
+		NCUA_FINANCIALS_HISTORY.OTHER_UNSECURED_LOANS as OTHER_UNSECURED_LOANS comment='Credit Analysis balance sheet: Other Unsecured Loans, including payday alternative (PAL) and nonfederally guaranteed student loans, dollars.',
+		NCUA_FINANCIALS_HISTORY.NEW_AUTO_LOANS as NEW_AUTO_LOANS comment='Credit Analysis balance sheet: New Autos (new vehicle loans), dollars.',
+		NCUA_FINANCIALS_HISTORY.USED_AUTO_LOANS as USED_AUTO_LOANS comment='Credit Analysis balance sheet: Used Autos (used vehicle loans), dollars.',
+		NCUA_FINANCIALS_HISTORY.LEASES_RECEIVABLE as LEASES_RECEIVABLE comment='Credit Analysis balance sheet: Leases (leases receivable), dollars.',
+		NCUA_FINANCIALS_HISTORY.OTHER_SECURED_NON_RE_LOANS as OTHER_SECURED_NON_RE_LOANS comment='Credit Analysis balance sheet: Other Secured (Non RE) consumer loans, dollars.',
+		NCUA_FINANCIALS_HISTORY.FIRST_MORTGAGE_LOANS as FIRST_MORTGAGE_LOANS comment='Credit Analysis balance sheet: 1st Mortgage (first-lien 1-4 family residential real estate loans), dollars.',
+		NCUA_FINANCIALS_HISTORY.SECOND_MORTGAGE_LOANS as SECOND_MORTGAGE_LOANS comment='Credit Analysis balance sheet: 2nd Mortgage (junior-lien 1-4 family loans, including home equity), dollars.',
+		NCUA_FINANCIALS_HISTORY.OTHER_NON_COMMERCIAL_RE_LOANS as OTHER_NON_COMMERCIAL_RE_LOANS comment='Credit Analysis balance sheet: Other Non-Commercial RE loans, dollars.',
+		NCUA_FINANCIALS_HISTORY.COMMERCIAL_RE_SECURED_LOANS as COMMERCIAL_RE_SECURED_LOANS comment='Credit Analysis balance sheet: RE Secured Commercial (real-estate-secured commercial loans), dollars.',
+		NCUA_FINANCIALS_HISTORY.COMMERCIAL_NON_RE_SECURED_LOANS as COMMERCIAL_NON_RE_SECURED_LOANS comment='Credit Analysis balance sheet: Non-RE Secured Commercial loans, dollars.',
+		NCUA_FINANCIALS_HISTORY.LOANS_EXCL_HELD_FOR_SALE as LOANS_EXCL_HELD_FOR_SALE comment='Credit Analysis balance sheet "Total Loans": total loans and leases excluding loans held for sale, dollars.',
+		NCUA_FINANCIALS_HISTORY.LOANS_HELD_FOR_SALE as LOANS_HELD_FOR_SALE comment='Credit Analysis balance sheet: Loans Held For Sale, dollars.',
+		NCUA_FINANCIALS_HISTORY.LOAN_LOSS_ALLOWANCE as LOAN_LOSS_ALLOWANCE comment='Credit Analysis balance sheet: Loan Loss Allowance (allowance for loan and lease losses / credit losses), a contra-asset shown as a deduction, dollars.',
+		NCUA_FINANCIALS_HISTORY.LAND_AND_BUILDING as LAND_AND_BUILDING comment='Credit Analysis balance sheet: Land and Building, dollars.',
+		NCUA_FINANCIALS_HISTORY.OTHER_FIXED_ASSETS as OTHER_FIXED_ASSETS comment='Credit Analysis balance sheet: Other Fixed Assets, dollars.',
+		NCUA_FINANCIALS_HISTORY.ALL_OTHER_ASSETS as ALL_OTHER_ASSETS comment='Credit Analysis balance sheet: All Other Assets, the residual that ties the itemized assets to total assets, dollars.',
+		NCUA_FINANCIALS_HISTORY.ACCOUNTS_PAYABLE as ACCOUNTS_PAYABLE comment='Credit Analysis balance sheet: Accounts Payable (and other liabilities), dollars.',
+		NCUA_FINANCIALS_HISTORY.ACCRUED_DIVIDENDS_AND_INTEREST as ACCRUED_DIVIDENDS_AND_INTEREST comment='Credit Analysis balance sheet: Accrued Dividends (and interest payable), dollars.',
+		NCUA_FINANCIALS_HISTORY.ALLOWANCE_OFF_BALANCE_SHEET_EXPOSURES as ALLOWANCE_OFF_BALANCE_SHEET_EXPOSURES comment='Credit Analysis balance sheet: Allowance for Off-Balance-Sheet Credit Exposures, dollars.',
+		NCUA_FINANCIALS_HISTORY.BORROWINGS as BORROWINGS comment='Credit Analysis balance sheet: Borrowings (total borrowings), dollars.',
+		NCUA_FINANCIALS_HISTORY.MEMBER_SHARES as MEMBER_SHARES comment='Credit Analysis balance sheet: Member Shares (total shares, excluding nonmember deposits), dollars.',
+		NCUA_FINANCIALS_HISTORY.NONMEMBER_DEPOSITS as NONMEMBER_DEPOSITS comment='Credit Analysis balance sheet: Nonmember Deposits, dollars.',
+		NCUA_FINANCIALS_HISTORY.TOTAL_LIABILITIES as TOTAL_LIABILITIES comment='Credit Analysis balance sheet: Total Liabilities = accounts payable + accrued dividends + allowance for off-balance-sheet exposures + borrowings + member shares + nonmember deposits.',
+		NCUA_FINANCIALS_HISTORY.UNDIVIDED_EARNINGS as UNDIVIDED_EARNINGS comment='Credit Analysis balance sheet: Undivided Earnings (retained earnings), dollars.',
+		NCUA_FINANCIALS_HISTORY.ALL_OTHER_RESERVES as ALL_OTHER_RESERVES comment='Credit Analysis balance sheet: All Other Reserves (other equity, including accumulated unrealized gains and losses), dollars. NCUA defines it only from March 2022, so it is empty (not zero) for earlier quarters.',
+		NCUA_FINANCIALS_HISTORY.TOTAL_LIABILITIES_AND_CAPITAL as TOTAL_LIABILITIES_AND_CAPITAL comment='Credit Analysis balance sheet: Total Liabilities and Capital (equals total assets).',
+		NCUA_FINANCIALS_HISTORY.DELINQUENT_LOANS_2_TO_6_MONTHS as DELINQUENT_LOANS_2_TO_6_MONTHS comment='Credit Analysis balance sheet: loans delinquent 2 to 6 months, dollars. NCUA redefined this bucket in March 2022.',
+		NCUA_FINANCIALS_HISTORY.DELINQUENT_LOANS_6_TO_12_MONTHS as DELINQUENT_LOANS_6_TO_12_MONTHS comment='Credit Analysis balance sheet: loans delinquent 6 to 12 months, dollars.',
+		NCUA_FINANCIALS_HISTORY.DELINQUENT_LOANS_OVER_12_MONTHS as DELINQUENT_LOANS_OVER_12_MONTHS comment='Credit Analysis balance sheet: loans delinquent over 12 months, dollars.',
+		NCUA_FINANCIALS_HISTORY.LOAN_AND_LEASE_INTEREST_YTD as LOAN_AND_LEASE_INTEREST_YTD comment='Credit Analysis income statement: Loan and Lease Interest, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.INTEREST_REBATES_YTD as INTEREST_REBATES_YTD comment='Credit Analysis income statement: (Less) Rebates of loan interest, year-to-date dollars; subtracted from income.',
+		NCUA_FINANCIALS_HISTORY.FEE_INCOME_YTD as FEE_INCOME_YTD comment='Credit Analysis income statement: Fee Income, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.INVESTMENT_INCOME_YTD as INVESTMENT_INCOME_YTD comment='Credit Analysis income statement: Investment Income, year-to-date dollars. NCUA redefined it in March 2022.',
+		NCUA_FINANCIALS_HISTORY.OTHER_OPERATING_INCOME_YTD as OTHER_OPERATING_INCOME_YTD comment='Credit Analysis income statement: other operating income (shown on the report as "Other Investment Income"), year-to-date dollars. NCUA redefined it in March 2021.',
+		NCUA_FINANCIALS_HISTORY.TOTAL_INCOME_YTD as TOTAL_INCOME_YTD comment='Credit Analysis income statement: Total Income = loan interest - rebates + fee income + investment income + other operating income, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.SALARIES_AND_BENEFITS_YTD as SALARIES_AND_BENEFITS_YTD comment='Credit Analysis income statement: Salaries and Benefits expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.OFFICE_OCCUPANCY_YTD as OFFICE_OCCUPANCY_YTD comment='Credit Analysis income statement: Office Occupancy expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.OFFICE_OPERATIONS_YTD as OFFICE_OPERATIONS_YTD comment='Credit Analysis income statement: Office Operations expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.EDUCATIONAL_AND_PROMOTIONAL_YTD as EDUCATIONAL_AND_PROMOTIONAL_YTD comment='Credit Analysis income statement: Educational and Promotional expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.LOAN_SERVICING_YTD as LOAN_SERVICING_YTD comment='Credit Analysis income statement: Loan Servicing expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.PROFESSIONAL_AND_OUTSIDE_SERVICES_YTD as PROFESSIONAL_AND_OUTSIDE_SERVICES_YTD comment='Credit Analysis income statement: Professional and Outside Services expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.MEMBER_INSURANCE_YTD as MEMBER_INSURANCE_YTD comment='Credit Analysis income statement: Member Insurance expense, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.ALL_OTHER_EXPENSES_YTD as ALL_OTHER_EXPENSES_YTD comment='Credit Analysis income statement: All Other Expenses, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.OPERATING_EXPENSES_YTD as OPERATING_EXPENSES_YTD comment='Credit Analysis income statement: Expense Subtotal (total operating expenses, before the provision for loan losses), year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.PROVISION_FOR_LOAN_LOSSES_YTD as PROVISION_FOR_LOAN_LOSSES_YTD comment='Credit Analysis income statement: Provision for Loan Loss (credit loss expense), year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.NON_OPERATING_GAIN_LOSS_YTD as NON_OPERATING_GAIN_LOSS_YTD comment='Credit Analysis income statement: Non Operating Gain (Loss), year-to-date dollars. NCUA redefined it in March 2021.',
+		NCUA_FINANCIALS_HISTORY.NET_INCOME_BEFORE_DIVIDENDS_YTD as NET_INCOME_BEFORE_DIVIDENDS_YTD comment='Credit Analysis income statement: Net Income Before Dividends and Interest = total income - operating expenses - provision for loan losses + non-operating gain (loss), year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.INTEREST_ON_BORROWINGS_YTD as INTEREST_ON_BORROWINGS_YTD comment='Credit Analysis income statement: Interest on Borrowings, year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.DIVIDENDS_YTD as DIVIDENDS_YTD comment='Credit Analysis income statement: Dividends (dividends and interest paid on shares and deposits), year-to-date dollars.',
+		NCUA_FINANCIALS_HISTORY.COST_OF_FUNDS_YTD as COST_OF_FUNDS_YTD comment='Credit Analysis income statement: Subtotal (Cost of Funds) = interest on borrowings + dividends, year-to-date dollars.',
 		NCUA_FINANCIALS_HISTORY.FULL_TIME_EMPLOYEES as FULL_TIME_EMPLOYEES comment='Number of full-time employees at quarter end.',
 		NCUA_FINANCIALS_HISTORY.PART_TIME_EMPLOYEES as PART_TIME_EMPLOYEES comment='Number of part-time employees at quarter end.',
 		NCUA_FINANCIALS_HISTORY.TOTAL_EMPLOYEES as TOTAL_EMPLOYEES comment='Total employee headcount at quarter end: full-time plus part-time employees.',
@@ -60,7 +116,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.NET_CHARGEOFFS_ANNUALIZED as NET_CHARGEOFFS_ANNUALIZED comment='Year-to-date net charge-offs annualized (YTD x 4 / quarter), in dollars.',
 		NCUA_FINANCIALS_HISTORY.AVG_ASSETS_YTD as AVG_ASSETS_YTD comment='Average of quarter-end and prior year-end total assets; denominator for return on assets.',
 		NCUA_FINANCIALS_HISTORY.AVG_LOANS_YTD as AVG_LOANS_YTD comment='Average of quarter-end and prior year-end total loans; denominator for the net charge-off rate.',
-		NCUA_FINANCIALS_HISTORY.NET_WORTH_RATIO_PCT as NET_WORTH_RATIO_PCT comment='Net worth as a percent of total assets for one credit union.',
+		NCUA_FINANCIALS_HISTORY.NET_WORTH_RATIO_PCT as NET_WORTH_RATIO_PCT comment='NCUA''s official PCA net worth ratio for one credit union, percent (the Credit Analysis report''s "Net Capital"). It can differ slightly from net worth divided by quarter-end assets because NCUA allows other total-asset measures.',
 		NCUA_FINANCIALS_HISTORY.LOAN_TO_SHARE_PCT as LOAN_TO_SHARE_PCT comment='Total loans as a percent of total shares and deposits for one credit union.',
 		NCUA_FINANCIALS_HISTORY.DELINQUENCY_RATE_PCT as DELINQUENCY_RATE_PCT comment='Delinquent loans as a percent of total loans for one credit union.',
 		NCUA_FINANCIALS_HISTORY.ROA_PCT as ROA_PCT comment='Return on assets for one credit union: annualized net income as a percent of average assets.',
@@ -142,7 +198,8 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 	ai_sql_generation 'To find a credit union by name, search CU_NAME_ALIASES (current, former, website, and trade names): match ALIAS_KEY LIKE ''%'' || CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''<name the user typed>'') || ''%'', take the distinct NIMBLE_CUNA_IDs, and join them to CU_ORACLE_LIVE. Never search CU_ORACLE_LIVE.NAME directly with words like Credit Union, Federal Credit Union, CU, or FCU. Narrow by city or state when the user gives one. If more than one credit union matches, list them with city and state and ask which one. Report the credit union under its current NAME; if it matched on a former or trade name, say so (e.g. "Everwise Credit Union, formerly Teachers Credit Union"). If nothing matches, try JAROWINKLER_SIMILARITY(ALIAS_KEY, CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''<name>'')) >= 90 before saying the credit union was not found.
 Default universe for counts, totals, and other aggregates across credit unions (e.g. how many credit unions have fewer than 10 employees, total industry assets, credit unions by state): every credit union that filed the most recent call report, i.e. NCUA_FINANCIALS_HISTORY rows with IS_LATEST_PERIOD = TRUE, whatever their STATUS. Count them with COUNT(DISTINCT JOIN_NUMBER) and join to CU_ORACLE_LIVE only for attributes such as state, league, or name. Do not filter on STATUS unless the question asks about status (active, merged, liquidated, pending, conservatorship). Exception: any question involving affiliation, with America''s Credit Unions (AFL) or a state league (LEAGUE_AFFILIATED), uses CU_ORACLE_LIVE credit unions with STATUS IN (''A'', ''P''). Always say which group the figures cover (e.g. "credit unions that filed the June 30, 2026 call report").
 NCUA_FINANCIALS_HISTORY has one row per credit union per quarter. Unless the question asks about a specific past period, a trend, a change over time, or growth, filter it to IS_LATEST_PERIOD = TRUE. Never sum balance amounts (assets, loans, shares, net worth, members, employees) across quarters; for totals over time, group by PERIOD_DATE.
-Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year.
+Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year. The same applies to every income statement column ending _YTD: for a full year use QUARTER = 4; to compare across quarters annualize as value * 4 / QUARTER; for one quarter subtract the prior quarter''s YTD value in the same year (Q1 needs no subtraction). Say which you did.
+The balance sheet and income statement columns use the same line items, labels, and definitions as America''s Credit Unions'' Credit Analysis reports; when asked for a credit union''s balance sheet or income statement, present them in the report''s order. NCUA redefined several lines in March 2021 or March 2022 (noted in their descriptions); mention this when a trend crosses those dates.
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
 When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
 States: the state a credit union is in is always its charter state, never its address. Use NCUA_FINANCIALS_HISTORY.CHARTERSTATE with financial data and CU_ORACLE_LIVE.CHARTER_STATE otherwise (including affiliation questions); use ST_STATE, PO_STATE, and city only to describe an address or to identify a specific credit union the user describes by location.
@@ -370,5 +427,52 @@ FROM
   JOIN ncua_financials_history AS h ON h.join_number = col.join_number
 WHERE
   h.is_latest_period
-  AND col.status = ''A''')
+  AND col.status = ''A'''),
+		"Show Heartland Credit Union in Madison Wisconsin's 2025 income statement" AS (
+QUESTION 'Show Heartland Credit Union in Madison Wisconsin''s 2025 income statement'
+VERIFIED_AT 1792022400
+VERIFIED_BY 'Claude Code (for Paul Ledin)'
+ONBOARDING_QUESTION false
+SQL 'WITH matches AS (
+  SELECT DISTINCT
+    nimble_cuna_id
+  FROM
+    cu_name_aliases
+  WHERE
+    alias_key LIKE ''%'' || CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''Heartland'') || ''%''
+)
+SELECT
+  col.name,
+  h.period_date,
+  h.loan_and_lease_interest_ytd,
+  h.interest_rebates_ytd,
+  h.fee_income_ytd,
+  h.investment_income_ytd,
+  h.other_operating_income_ytd,
+  h.total_income_ytd,
+  h.salaries_and_benefits_ytd,
+  h.office_occupancy_ytd,
+  h.office_operations_ytd,
+  h.educational_and_promotional_ytd,
+  h.loan_servicing_ytd,
+  h.professional_and_outside_services_ytd,
+  h.member_insurance_ytd,
+  h.all_other_expenses_ytd,
+  h.operating_expenses_ytd,
+  h.provision_for_loan_losses_ytd,
+  h.non_operating_gain_loss_ytd,
+  h.net_income_before_dividends_ytd,
+  h.interest_on_borrowings_ytd,
+  h.dividends_ytd,
+  h.cost_of_funds_ytd,
+  h.net_income_ytd
+FROM
+  matches AS m
+  JOIN cu_oracle_live AS col ON col.nimble_cuna_id = m.nimble_cuna_id
+  JOIN ncua_financials_history AS h ON h.join_number = col.join_number
+WHERE
+  LOWER(col.st_city) = ''madison''
+  AND col.charter_state = ''WI''
+  AND h.year = 2025
+  AND h.quarter = 4')
 	);
