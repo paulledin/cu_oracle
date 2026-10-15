@@ -5,6 +5,8 @@
 -- 2026-10-15: clarified LAST_REPORTED_ fields (any credit union back to 1994) vs
 -- NCUA_FINANCIALS_HISTORY (latest five years), with a routing rule and example.
 -- 2026-10-15: SURVIVOR_ and CURRENT_SUCCESSOR_ merger fields on CU_ORACLE_LIVE.
+-- 2026-10-15: CU_NAME_ALIASES for name matching (see cu_name_aliases.sql);
+-- STATUS C = Conservatorship.
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -12,11 +14,13 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 	tables (
 		CU_ORACLE_AGENT_DB.ANALYTICS.CURRENT_NCUA_BRANCH_FILE comment='The table contains records of credit union branch locations as reported to the NCUA. Each record represents a single branch site and includes details about the site type, physical address, contact information, and available member services such as ATM and drive-through access.',
 		CU_ORACLE_AGENT_DB.ANALYTICS.CU_ORACLE_LIVE primary key (NIMBLE_CUNA_ID) unique (JOIN_NUMBER) comment='The table contains records of all US credit unions ever known to America''s Credit Unions (formally CUNA and NAFCU) and recorded in their Association Management Software (AMS). Specifically it includes their organizational and contact information. Each record represents a single credit union and includes details about its location, financial condition, leadership, and affiliations.',
+		CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_ALIASES comment='Every name a credit union is or was known by, one row per name: its current name, NCUA legal names (current and former, with the quarters used), website names (e.g. penfed for Pentagon FCU), and hand-maintained trade names (e.g. PenFed, Navy Federal, SECU). Use it to find credit unions by name, then join to CU_ORACLE_LIVE on NIMBLE_CUNA_ID.',
 		CU_ORACLE_AGENT_DB.ANALYTICS.NCUA_FINANCIALS_HISTORY primary key (JOIN_NUMBER, PERIOD_DATE) comment='Quarterly NCUA 5300 call report financials, one row per credit union per quarter, covering only the latest five years. Credit unions that merged, liquidated, or stopped reporting before that window are not in this table; use CU_ORACLE_LIVE.LAST_REPORTED_ fields for them. Use for current financials (filter IS_LATEST_PERIOD), time series, trends, growth rates, and multi-period ratios. Balance amounts are as of the quarter end; never add them up across quarters.'
 	)
 	relationships (
 		CURRENT_NCUA_BRANCH_FILE_TO_CU_ORACLE_LIVE as CURRENT_NCUA_BRANCH_FILE(JOIN_NUMBER) references CU_ORACLE_LIVE(JOIN_NUMBER),
-		NCUA_FINANCIALS_HISTORY_TO_CU_ORACLE_LIVE as NCUA_FINANCIALS_HISTORY(JOIN_NUMBER) references CU_ORACLE_LIVE(JOIN_NUMBER)
+		NCUA_FINANCIALS_HISTORY_TO_CU_ORACLE_LIVE as NCUA_FINANCIALS_HISTORY(JOIN_NUMBER) references CU_ORACLE_LIVE(JOIN_NUMBER),
+		CU_NAME_ALIASES_TO_CU_ORACLE_LIVE as CU_NAME_ALIASES(NIMBLE_CUNA_ID) references CU_ORACLE_LIVE(NIMBLE_CUNA_ID)
 	)
 	facts (
 		CURRENT_NCUA_BRANCH_FILE.FCHT as FCHT comment='The National Credit Union Administration (NCUA) assigned federal charter number. FCHT < 60000 = Federally Chartered and Federally Insured, 60000-80000 = State Chartered Federally Insured, > 80000 = State Chartered, Privately Insured.' sample_values ('6', '1815', '3202'),
@@ -96,7 +100,13 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.ST_CITY as ST_CITY comment='The city of the physical/street address of the credit union.' sample_values ('Rochester', 'Boulder', 'Fort Wayne'),
 		CU_ORACLE_LIVE.ST_STATE as ST_STATE comment='The two-letter state abbreviation of the physical/mailing address of the credit union.' sample_values ('NY', 'PA', 'IL'),
 		CU_ORACLE_LIVE.ST_ZIP_CODE as ST_ZIP_CODE comment='The postal zip code of the physical/street address of the credit union.' sample_values ('12110-1007', '14624-4537', '92705-4934'),
-		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, L=Liquidated, I=Inactive' sample_values ('M', 'L', 'A'),
+		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, L=Liquidated, I=Inactive, C=Conservatorship (operating under NCUA conservatorship; still files call reports)' sample_values ('M', 'L', 'A'),
+		CU_NAME_ALIASES.ALIAS as ALIAS comment='One name the credit union is or was known by, as written in its source.' sample_values ('PenFed', 'PENTAGON', 'Teachers Credit Union'),
+		CU_NAME_ALIASES.ALIAS_KEY as ALIAS_KEY comment='Normalized matching key for ALIAS, from CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(): lowercase, no spaces or punctuation, without credit union / federal credit union / FCU / CU, and with EFCU/ECU shown as employees. Compare it to CU_NAME_KEY() of the name the user typed.' sample_values ('penfed', 'pentagon', 'boeingemployees'),
+		CU_NAME_ALIASES.ALIAS_TYPE as ALIAS_TYPE comment='Where the name comes from: Current name (America''s Credit Unions records), NCUA name (current legal name on call reports), Former NCUA name (an earlier legal name, e.g. before a rebrand), Website name, or Trade name (hand-maintained).' sample_values ('Current name', 'Former NCUA name', 'Trade name'),
+		CU_NAME_ALIASES.FIRST_PERIOD as FIRST_PERIOD comment='For NCUA and website names, the first quarter-end the name appeared on a call report.',
+		CU_NAME_ALIASES.LAST_PERIOD as LAST_PERIOD comment='For NCUA and website names, the last quarter-end the name appeared on a call report.',
+		CU_NAME_ALIASES.NIMBLE_CUNA_ID as NIMBLE_CUNA_ID comment='America''s Credit Unions ID of the credit union this name belongs to; joins to CU_ORACLE_LIVE.NIMBLE_CUNA_ID.',
 		CU_ORACLE_LIVE.STATUS_CHG_DATE as STATUS_CHG_DATE comment='The date on which the status was last changed.' sample_values ('1949-07-11', '1950-12-08', '1953-11-20'),
 		CU_ORACLE_LIVE.TOM_CODE as TOM_CODE comment='Type of Membership (TOM) code, also known as Field of Membership (FOM) code.' sample_values ('00', '01', '36'),
 		CU_ORACLE_LIVE.SURVIVOR_ID as SURVIVOR_ID comment='For a merged credit union (STATUS = M), the NIMBLE_CUNA_ID of the credit union it merged into directly. Empty for credit unions that have not merged.',
@@ -120,7 +130,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		NCUA_FINANCIALS_HISTORY.AGG_ROA_PCT as SUM(net_income_annualized) / NULLIF(SUM(avg_assets_ytd), 0) * 100 comment='Aggregate return on assets for a group of credit unions (annualized net income over average assets, percent).',
 		NCUA_FINANCIALS_HISTORY.AGG_NET_CHARGEOFF_RATE_PCT as SUM(net_chargeoffs_annualized) / NULLIF(SUM(avg_loans_ytd), 0) * 100 comment='Aggregate net charge-off rate for a group of credit unions (annualized net charge-offs over average loans, percent).'
 	)
-	ai_sql_generation 'Never include the words: Credit Union, Federal Credit Union, CU, or FCU in a name search. Always use wildcards for name searches.
+	ai_sql_generation 'To find a credit union by name, search CU_NAME_ALIASES (current, former, website, and trade names): match ALIAS_KEY LIKE ''%'' || CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''<name the user typed>'') || ''%'', take the distinct NIMBLE_CUNA_IDs, and join them to CU_ORACLE_LIVE. Never search CU_ORACLE_LIVE.NAME directly with words like Credit Union, Federal Credit Union, CU, or FCU. Narrow by city or state when the user gives one. If more than one credit union matches, list them with city and state and ask which one. Report the credit union under its current NAME; if it matched on a former or trade name, say so (e.g. "Everwise Credit Union, formerly Teachers Credit Union"). If nothing matches, try JAROWINKLER_SIMILARITY(ALIAS_KEY, CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''<name>'')) >= 90 before saying the credit union was not found.
 NCUA_FINANCIALS_HISTORY has one row per credit union per quarter. Unless the question asks about a specific past period, a trend, a change over time, or growth, filter it to IS_LATEST_PERIOD = TRUE. Never sum balance amounts (assets, loans, shares, net worth, members, employees) across quarters; for totals over time, group by PERIOD_DATE.
 Net income and net charge-offs are reported year-to-date: use the _QTR columns for a single quarter, the _ANNUALIZED columns to compare quarters, and the year-end (QUARTER = 4) _YTD value for a full calendar year.
 For one credit union, use the _PCT ratio and growth columns. For a group, state, or the whole industry, use the AGG_ metrics (sum of numerators over sum of denominators); never average individual credit unions'' ratios.
@@ -292,5 +302,32 @@ WHERE
   LOWER(g.name) LIKE ''%gesa%''
   AND g.status = ''A''
 ORDER BY
-  m.status_chg_date DESC')
+  m.status_chg_date DESC'),
+		"What are PenFed's total assets and members?" AS (
+QUESTION 'What are PenFed''s total assets and members?'
+VERIFIED_AT 1792022400
+VERIFIED_BY 'Claude Code (for Paul Ledin)'
+ONBOARDING_QUESTION false
+SQL 'WITH matches AS (
+  SELECT DISTINCT
+    nimble_cuna_id
+  FROM
+    cu_name_aliases
+  WHERE
+    alias_key LIKE ''%'' || CU_ORACLE_AGENT_DB.ANALYTICS.CU_NAME_KEY(''PenFed'') || ''%''
+)
+SELECT
+  col.name,
+  col.st_city,
+  col.st_state,
+  h.period_date,
+  h.total_assets,
+  h.members
+FROM
+  matches AS m
+  JOIN cu_oracle_live AS col ON col.nimble_cuna_id = m.nimble_cuna_id
+  JOIN ncua_financials_history AS h ON h.join_number = col.join_number
+WHERE
+  h.is_latest_period
+  AND col.status = ''A''')
 	);

@@ -230,11 +230,15 @@ END;
 $$;
 
 -- Daily check at 6am Eastern: rebuilds only when a newer NCUA quarter has been loaded.
+-- Also refreshes the NCUA name history used for name matching (cu_name_aliases.sql).
 CREATE OR REPLACE TASK CU_ORACLE_AGENT_DB.ANALYTICS.REFRESH_NCUA_FINANCIALS_HISTORY_TASK
     WAREHOUSE = PAUL_WH
     SCHEDULE = 'USING CRON 0 6 * * * America/New_York'
-    COMMENT = 'Daily: rebuild NCUA_FINANCIALS_HISTORY if a newer NCUA quarter is available.'
+    COMMENT = 'Daily: rebuild NCUA_FINANCIALS_HISTORY and CU_NAME_HISTORY_NCUA if a newer NCUA quarter is available.'
 AS
+BEGIN
     CALL CU_ORACLE_AGENT_DB.ANALYTICS.REFRESH_NCUA_FINANCIALS_HISTORY(21, FALSE);
+    CALL CU_ORACLE_AGENT_DB.ANALYTICS.REFRESH_CU_NAME_HISTORY(FALSE);
+END;
 
 ALTER TASK CU_ORACLE_AGENT_DB.ANALYTICS.REFRESH_NCUA_FINANCIALS_HISTORY_TASK RESUME;

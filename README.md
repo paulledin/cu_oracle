@@ -24,6 +24,7 @@ instruction constants at the top of `CU_Oracle.py`.
 | `snowflake/ncua_financials_history.sql` | Procedure + daily task that rebuild the five-year quarterly NCUA history table |
 | `snowflake/cu_oracle_live.sql` | `CU_ORACLE_LIVE` dynamic table (from `ACUS_DATA.CORE_DATA`) |
 | `snowflake/current_ncua_branch_file.sql` | `CURRENT_NCUA_BRANCH_FILE` dynamic table (latest NCUA branch file) |
+| `snowflake/cu_name_aliases.sql` | Name matching: `CU_NAME_KEY()` normalizer, NCUA name history, hand-maintained `CU_TRADE_NAMES`, and the `CU_NAME_ALIASES` view |
 
 ## Data
 
@@ -39,6 +40,11 @@ The semantic view covers three tables in `CU_ORACLE_AGENT_DB.ANALYTICS`:
 - `CURRENT_NCUA_BRANCH_FILE` - NCUA branch locations, current quarter only (the
   quarterly branch files are still a work in progress, so there is no branch
   history yet). Branch counts come from `CU_ORACLE_LIVE.BRANCHES`.
+
+- `CU_NAME_ALIASES` - every name a credit union is or was known by (current,
+  former NCUA legal names, website names, and trade names), used to find credit
+  unions by name. Add trade names with an `INSERT` into `CU_TRADE_NAMES`; they take
+  effect immediately.
 
 Schema future grants give `CU_ORACLE_APP_READ` access to anything (re)created in
 `ANALYTICS`, so rebuilds don't break the app.
