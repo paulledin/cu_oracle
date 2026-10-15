@@ -2,6 +2,8 @@
 -- 2026-10-08: CURRENT_NCUA_FINANCIALS_FILE (latest quarter only) replaced by
 -- NCUA_FINANCIALS_HISTORY (one row per credit union per quarter, five years).
 -- 2026-10-08: merger flags, acquired balances, and organic growth columns added.
+-- 2026-10-15: clarified LAST_REPORTED_ fields (any credit union back to 1994) vs
+-- NCUA_FINANCIALS_HISTORY (latest five years), with a routing rule and example.
 -- Run as SYSADMIN. The view name is a placeholder so it can be built under a
 -- test name first: replace {{VIEW_NAME}} before running.
 
@@ -9,7 +11,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 	tables (
 		CU_ORACLE_AGENT_DB.ANALYTICS.CURRENT_NCUA_BRANCH_FILE comment='The table contains records of credit union branch locations as reported to the NCUA. Each record represents a single branch site and includes details about the site type, physical address, contact information, and available member services such as ATM and drive-through access.',
 		CU_ORACLE_AGENT_DB.ANALYTICS.CU_ORACLE_LIVE primary key (NIMBLE_CUNA_ID) unique (JOIN_NUMBER) comment='The table contains records of all US credit unions ever known to America''s Credit Unions (formally CUNA and NAFCU) and recorded in their Association Management Software (AMS). Specifically it includes their organizational and contact information. Each record represents a single credit union and includes details about its location, financial condition, leadership, and affiliations.',
-		CU_ORACLE_AGENT_DB.ANALYTICS.NCUA_FINANCIALS_HISTORY primary key (JOIN_NUMBER, PERIOD_DATE) comment='Quarterly NCUA 5300 call report financials for every credit union, one row per credit union per quarter, covering the latest five years. Use for current financials (filter IS_LATEST_PERIOD), time series, trends, growth rates, and multi-period ratios. Balance amounts are as of the quarter end; never add them up across quarters.'
+		CU_ORACLE_AGENT_DB.ANALYTICS.NCUA_FINANCIALS_HISTORY primary key (JOIN_NUMBER, PERIOD_DATE) comment='Quarterly NCUA 5300 call report financials, one row per credit union per quarter, covering only the latest five years. Credit unions that merged, liquidated, or stopped reporting before that window are not in this table; use CU_ORACLE_LIVE.LAST_REPORTED_ fields for them. Use for current financials (filter IS_LATEST_PERIOD), time series, trends, growth rates, and multi-period ratios. Balance amounts are as of the quarter end; never add them up across quarters.'
 	)
 	relationships (
 		CURRENT_NCUA_BRANCH_FILE_TO_CU_ORACLE_LIVE as CURRENT_NCUA_BRANCH_FILE(JOIN_NUMBER) references CU_ORACLE_LIVE(JOIN_NUMBER),
@@ -21,9 +23,9 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.ACTIVE_CU_WITH_CHARTER labels = (filter) as NOT fcht IS NULL AND status = 'A' comment='Filters for credit unions that are currently active (status = ''A'') and have a valid NCUA federal charter number (fcht is not null). Use when questions ask about ''active credit unions'', ''how many active credit unions are there'', or require counting/analyzing credit unions that are both operational and have an NCUA charter on record. Helps ensure analysis focuses on currently operating, federally recognized credit unions.',
 		CU_ORACLE_LIVE.FCHT as FCHT comment='The National Credit Union Administration (NCUA) assigned federal charter number. FCHT < 60000 = Federally Chartered and Federally Insured, 60000-80000 = State Chartered Federally Insured, > 80000 = State Chartered, Privately Insured.' sample_values ('2275', '884', '22530'),
 		CU_ORACLE_LIVE.JOIN_NUMBER as JOIN_NUMBER comment='The National Credit Union Administration (NCUA) assigned unique ID for joining NCUA call report data across time periods.' sample_values ('9531', '20759', '537'),
-		CU_ORACLE_LIVE.LAST_REPORTED_ASSETS as LAST_REPORTED_ASSETS comment='The credit union''s most recently National Credit Union Administration (NCUA) reported total assets, account code 010.' sample_values ('4604340', '229977718', '175586733'),
-		CU_ORACLE_LIVE.LAST_REPORTED_MEMBERS as LAST_REPORTED_MEMBERS comment='The credit union''s most recently National Credit Union Administration (NCUA) member count, account code 083.' sample_values ('3602', '3489', '5801'),
-		CU_ORACLE_LIVE.BRANCHES as BRANCHES comment='The credit union''s current number of offices, including its main office, as recorded by America''s Credit Unions. Use for how many branches or offices a credit union (or a group of credit unions) has.' sample_values ('1', '11', '388'),
+		CU_ORACLE_LIVE.LAST_REPORTED_ASSETS as LAST_REPORTED_ASSETS comment='Total assets in dollars (NCUA account code 010) from the credit union''s final or most recent NCUA call report, dated LAST_PERIOD_REPORTED. Available for any credit union that ever reported, back to 1994, including merged, liquidated, and inactive credit unions. The one source of assets for credit unions not in NCUA_FINANCIALS_HISTORY; for active credit unions it equals the latest quarter in NCUA_FINANCIALS_HISTORY.' sample_values ('4604340', '229977718', '175586733'),
+		CU_ORACLE_LIVE.LAST_REPORTED_MEMBERS as LAST_REPORTED_MEMBERS comment='Members (NCUA account code 083) from the credit union''s final or most recent NCUA call report, dated LAST_PERIOD_REPORTED. Available for any credit union that ever reported, back to 1994, including merged, liquidated, and inactive credit unions. The one source of member counts for credit unions not in NCUA_FINANCIALS_HISTORY.' sample_values ('3602', '3489', '5801'),
+		CU_ORACLE_LIVE.BRANCHES as BRANCHES comment='Number of offices, including the main office, as recorded by America''s Credit Unions: current for active credit unions, and as of the last record for merged, liquidated, or inactive ones. Use for how many branches or offices a credit union (or a group of credit unions) has.' sample_values ('1', '11', '388'),
 		NCUA_FINANCIALS_HISTORY.LATEST_PERIOD labels = (filter) as is_latest_period comment='Filters to the most recent quarter of NCUA financial data. Apply whenever a question asks for current, latest, or most recent financials, or does not mention a time period, trend, or growth.',
 		NCUA_FINANCIALS_HISTORY.JOIN_NUMBER as JOIN_NUMBER comment='The NCUA assigned unique ID for joining NCUA call report data across time periods.',
 		NCUA_FINANCIALS_HISTORY.CHARTER_NUMBER as CHARTER_NUMBER comment='The NCUA charter number (same as FCHT) as reported for this quarter.',
@@ -78,7 +80,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CURRENT_NCUA_BRANCH_FILE.SITETYPENAME as SITETYPENAME comment='The name of the site type classification for a branch location.' sample_values ('Corporate Office', 'Branch Office'),
 		CU_ORACLE_LIVE.AFL as AFL comment='Affiliation status of the credit union with America''s Credit Unions (ACUs) i.e. is the credit union currently affiliated with America''s Credit Unions (ACUs). A=Affiliated, N=Not Affiliated.' sample_values ('N', 'A'),
 		CU_ORACLE_LIVE.CEO_FULL_NAME as CEO_FULL_NAME comment='The full name of the chief executive officer.' sample_values ('Steven Shaffner', 'Pamela Goodman', 'Patrick Gallagher'),
-		CU_ORACLE_LIVE.LAST_PERIOD_REPORTED as LAST_PERIOD_REPORTED comment='The date of the last period for which the credit union has submitted 5300 Call Report data to the National Credit Union Administration (NCUA).' sample_values ('2025-12-31', '2025-06-30', '2012-09-30'),
+		CU_ORACLE_LIVE.LAST_PERIOD_REPORTED as LAST_PERIOD_REPORTED comment='Quarter-end date of the credit union''s final or most recent NCUA 5300 call report; the as-of date for LAST_REPORTED_ASSETS and LAST_REPORTED_MEMBERS. For merged or liquidated credit unions it is usually the quarter before the merger or liquidation.' sample_values ('2026-06-30', '2019-12-31', '2012-09-30'),
 		CU_ORACLE_LIVE.LEAGUE_AFFILIATED as LEAGUE_AFFILIATED comment='Affiliation status of the credit union with their state credit union league i.e. is the credit union currently affiliated with its state league. A=Affiliated, N=Not Affiliated.' sample_values ('A', 'N'),
 		CU_ORACLE_LIVE.LEAGUE_NAME as LEAGUE_NAME comment='The name of the state credit union league which the credit union belongs to, or would belong to if they were affiliated.' sample_values ('Tennessee League and Mississippi Credit Union Association', 'Illinois Credit Union League', 'CrossState Credit Union Association'),
 		CU_ORACLE_LIVE.NAME as NAME comment='The name of a credit union.' sample_values ('St Mark CU', 'Great Neck School EFCU', 'Molokai Community FCU'),
@@ -93,7 +95,7 @@ create or replace semantic view CU_ORACLE_AGENT_DB.ANALYTICS.{{VIEW_NAME}}
 		CU_ORACLE_LIVE.ST_CITY as ST_CITY comment='The city of the physical/street address of the credit union.' sample_values ('Rochester', 'Boulder', 'Fort Wayne'),
 		CU_ORACLE_LIVE.ST_STATE as ST_STATE comment='The two-letter state abbreviation of the physical/mailing address of the credit union.' sample_values ('NY', 'PA', 'IL'),
 		CU_ORACLE_LIVE.ST_ZIP_CODE as ST_ZIP_CODE comment='The postal zip code of the physical/street address of the credit union.' sample_values ('12110-1007', '14624-4537', '92705-4934'),
-		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, I=Inactive' sample_values ('M', 'P', 'A'),
+		CU_ORACLE_LIVE.STATUS as STATUS comment='The current status of the credit union in America''s Credit Union''s records. A=Active, P=Pending Merger/Liquidation, M=Merged, L=Liquidated, I=Inactive' sample_values ('M', 'L', 'A'),
 		CU_ORACLE_LIVE.STATUS_CHG_DATE as STATUS_CHG_DATE comment='The date on which the status was last changed.' sample_values ('1949-07-11', '1950-12-08', '1953-11-20'),
 		CU_ORACLE_LIVE.TOM_CODE as TOM_CODE comment='Type of Membership (TOM) code, also known as Field of Membership (FOM) code.' sample_values ('00', '01', '36'),
 		CU_ORACLE_LIVE.WEB as WEB comment='The website of the credit union.' sample_values ('www.lmhospcu.com', 'www.educationpersonnelfcu.com', 'www.greatplainsfcu.com'),
@@ -120,6 +122,7 @@ For one credit union, use the _PCT ratio and growth columns. For a group, state,
 When reporting or ranking a credit union''s asset or member growth, check MERGER_IN_PRIOR_YEAR; if TRUE, say it grew partly through mergers and also give ORGANIC_ASSETS_YOY_GROWTH_PCT or ORGANIC_MEMBERS_YOY_GROWTH_PCT. For questions about organic growth, use the ORGANIC_ columns.
 For how many branches or offices a credit union has, use CU_ORACLE_LIVE.BRANCHES. Use CURRENT_NCUA_BRANCH_FILE for branch locations, addresses, hours, and services (ATM, drive-through); it is current only, so there is no branch history.
 For growth over several years, compare the same quarter in each year (for example June 2021 to June 2026) and compute compound annual growth when asked for an annual rate. Always state which quarter-end dates the figures cover.
+Assets and members come from two places. NCUA_FINANCIALS_HISTORY has every quarter for the latest five years; use it for active credit unions and for anything over time. CU_ORACLE_LIVE.LAST_REPORTED_ASSETS and LAST_REPORTED_MEMBERS hold one figure per credit union from its final or most recent call report, back to 1994; use them for merged, liquidated, or inactive credit unions, or any credit union with no rows in NCUA_FINANCIALS_HISTORY. Whenever you report a LAST_REPORTED_ figure, also return LAST_PERIOD_REPORTED and state that date, and do not add up or rank LAST_REPORTED_ figures with different dates without saying so.
 For any question about affiliation, return AFL (affiliation with America''s Credit Unions) and LEAGUE_AFFILIATED (affiliation with the state league) as separate columns, America''s Credit Unions affiliation first; never combine or substitute one for the other.'
 	ai_question_categorization 'Dismissively reject, in a humorous way, any questions about commercial banks as unworthy of the CU Oracle''s compute tokens. Affiliation status with America''s Credit Unions (ACUs) is distinct from league affiliation and should always be reported separately with an emphasis on America''s Credit Unions Affiliation.'
 	ai_verified_queries (
@@ -242,5 +245,24 @@ WHERE
   AND LOWER(col.st_city) = ''madison''
   AND LOWER(col.st_state) = ''wi''
 ORDER BY
-  h.period_date')
+  h.period_date'),
+		"How big was Schools Financial Credit Union in Sacramento when it merged?" AS (
+QUESTION 'How big was Schools Financial Credit Union in Sacramento when it merged?'
+VERIFIED_AT 1792022400
+VERIFIED_BY 'Claude Code (for Paul Ledin)'
+ONBOARDING_QUESTION false
+SQL 'SELECT
+  name,
+  st_city,
+  st_state,
+  status,
+  status_chg_date,
+  last_period_reported,
+  last_reported_assets,
+  last_reported_members
+FROM
+  cu_oracle_live
+WHERE
+  LOWER(name) LIKE ''%schools financial%''
+  AND LOWER(st_city) = ''sacramento''')
 	);
