@@ -3,6 +3,7 @@
 -- the latest reported assets, members, employees, and branch count.
 -- 2026-10-15: added SURVIVOR_ and CURRENT_SUCCESSOR_ merger fields, and
 -- CHARTER_STATE (needs CU_NCUA_CHARTER_STATE from cu_name_aliases.sql first).
+-- 2026-10-16: AFL and LEAGUE_AFFILIATED empty for merged/liquidated credit unions.
 -- Dynamic table: refreshes itself (target lag 1 hour) when CORE_DATA changes.
 -- Run as SYSADMIN. The ANALYTICS schema's future grants give CU_ORACLE_APP_READ
 -- SELECT whenever this is re-created.
@@ -51,7 +52,11 @@ SELECT
     f1.nimble_cuna_id, f1.status, f1.name, f1.phone, f1.web, f1.league_name,
     f1.po_address, f1.po_city, f1.po_state, f1.po_zip_code,
     f1.st_address, f1.st_city, f1.st_state, f1.st_zip_code, f1.country,
-    f1.league_affiliated, f1.afl, f1.fcht, f1.ceo_full_name, f1.org_date, f1.tom_code,
+    -- Affiliation ends when a credit union merges or liquidates, so it is left
+    -- empty for those statuses rather than shown as "not affiliated".
+    IFF(f1.status IN ('M', 'L'), NULL, f1.league_affiliated) AS league_affiliated,
+    IFF(f1.status IN ('M', 'L'), NULL, f1.afl)               AS afl,
+    f1.fcht, f1.ceo_full_name, f1.org_date, f1.tom_code,
     f1.status_chg_date, f1.join_number,
     f1.total_assets AS "LAST_REPORTED_ASSETS", f1.members AS "LAST_REPORTED_MEMBERS",
     f1.last_period_reported,
